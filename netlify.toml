@@ -4,6 +4,7 @@
 [functions]
   directory = "netlify/functions"
   node_bundler = "esbuild"
+  external_node_modules = ["firebase-admin"]
 [build.environment]
   NODE_VERSION = "22"
 [[headers]]
@@ -15,5 +16,14 @@
     Permissions-Policy = "camera=(), microphone=(), geolocation=()"
 [[headers]]
   for = "/sw.js"
+  [headers.values]
+    Cache-Control = "no-cache"
+
+[[headers]]
+  for = "/app.js"
+  [headers.values]
+    Cache-Control = "no-cache"
+[[headers]]
+  for = "/index.html"
   [headers.values]
     Cache-Control = "no-cache"
