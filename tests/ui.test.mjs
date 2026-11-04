@@ -1,11 +1,12 @@
+import contract from '../public/project-contract.js';
 import test from 'node:test';import assert from 'node:assert/strict';import vm from 'node:vm';import {readFileSync} from 'node:fs';
 class Element {
  constructor(){this.style={};this.value='';this.hidden=false;this.children=[];this.dataset={};this.classList={toggle(){}};this.textContent='';this.disabled=false;}
  append(...x){this.children.push(...x)} replaceChildren(...x){this.children=x} setAttribute(){} closest(){return null} close(){} addEventListener(){}
 }
 function setup(){const nodes=new Map();const get=id=>{if(!nodes.has(id))nodes.set(id,new Element());return nodes.get(id)};const dialogs=[];
-const context=vm.createContext({document:{getElementById:get,createElement:()=>new Element(),querySelectorAll:()=>[...nodes.values()].filter(n=>n.id),querySelector:()=>null},window:{scrollTo(){},addEventListener(){},confirm:()=>true},navigator:{},localStorage:{getItem:()=>null,setItem(){}},setTimeout:()=>1,clearTimeout(){},AbortSignal,crypto:globalThis.crypto,console});
-vm.runInContext(readFileSync(new URL('../public/app.js',import.meta.url),'utf8').split('\nboot();')[0],context);return{context,get,run:s=>vm.runInContext(s,context)};}
+const context=vm.createContext({mountAgent:()=>({reset(){},refresh:async()=>{}}),contract,document:{getElementById:get,createElement:()=>new Element(),querySelectorAll:()=>[...nodes.values()].filter(n=>n.id),querySelector:()=>null},window:{scrollTo(){},addEventListener(){},confirm:()=>true},navigator:{},localStorage:{getItem:()=>null,setItem(){}},setTimeout:()=>1,clearTimeout(){},AbortSignal,crypto:globalThis.crypto,console});
+vm.runInContext(readFileSync(new URL('../public/app.js',import.meta.url),'utf8').replace(/^import .*\n/gm, '').split('\nboot();')[0],context);return{context,get,run:s=>vm.runInContext(s,context)};}
 test('selected account click preserves draft edit identity',()=>{const f=setup();f.run("editing='existing-draft';editingVersion=5;accountUI()");f.get('accounts').children[0].onclick();assert.equal(f.run('editing'),'existing-draft');assert.equal(f.run('editingVersion'),5);});
 test('account cannot switch during AI generation',async()=>{const f=setup();let resolve;f.context.pending=new Promise(r=>resolve=r);f.run("api=async()=>await pending;$('topic').value='MT Studio';accountUI()");const task=f.run("$('generate').onclick()");f.get('accounts').children[1].onclick();assert.equal(f.run('selected'),'mt-studio');resolve({text:'MT Studio লেখা'});await task;assert.equal(f.get('post').value,'MT Studio লেখা');assert.equal(f.run('busy'),false);});
 test('changing account clears old content with discard confirmation',()=>{const f=setup();f.run("$('post').value='পুরোনো লেখা';editing='draft-existing';dirty=true;accountUI()");f.get('accounts').children[1].onclick();assert.equal(f.run('selected'),'golapi-shop');assert.equal(f.get('post').value,'');assert.equal(f.run('editing'),null);});
