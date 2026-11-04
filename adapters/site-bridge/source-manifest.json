@@ -1,0 +1,50 @@
+{
+  "mt-studio": {
+    "uploadedArchive": "mt-studio-ai.com-main(1).zip",
+    "requiredFiles": [
+      "package.json",
+      "netlify.toml",
+      "lib/studio-settings.ts",
+      "lib/site-content.ts",
+      "app/api/payments/manual/route.ts",
+      "app/api/admin/route.ts",
+      "app/api/workspace/route.ts",
+      "app/api/contests/route.ts",
+      "firestore.rules"
+    ],
+    "sha256": {
+      "package.json": "12ad75b276fa6c00c2caa9d9a6a34f3285c2a2a08a539cdae6b923e72248bde8",
+      "netlify.toml": "dc1b7f03ed4c2a9c14aa8aa4c5cb02ec5851dcedaac6333b95c8282f93bbccdc",
+      "lib/studio-settings.ts": "82a354ccbbb97a7ef7ac1362ddef47c6164d8e1bdd53aac60d1d86acc408b782",
+      "lib/site-content.ts": "f1515dd69edda47478c30fe9e8a67578eff91f61a4d87b52f82b91d9b08b25bc",
+      "app/api/payments/manual/route.ts": "0ef3b3762dea83f356b6f01ddb188da7dc4456776acace0a6bd630cca3034aea",
+      "app/api/admin/route.ts": "d27c99408086bf43718fb4aa2529f1bd0cd96fa035ee0fce4cf50eff5d2b6eaa",
+      "app/api/workspace/route.ts": "2dd3155a6bf0d29c05c58a7f705c12c3edc14caa58b81c9ad06c94176b5e0cb9",
+      "app/api/contests/route.ts": "dff49dd8bd78d85f830b7733382421ea7badaa61ec0d593e0c8314566efedc47",
+      "firestore.rules": "c0badb8cdb3e112f8c7aeb925d9ccfa87ee9622ef8ce1f75c5e253195ce6608c"
+    }
+  },
+  "golapi-shop": {
+    "uploadedArchive": "golapishop.online-main.zip",
+    "requiredFiles": [
+      "package.json",
+      "netlify.toml",
+      "functions/index.js",
+      "js/admin.js",
+      "js/services.js",
+      "js/support.js",
+      "js/company-settings.js",
+      "firestore.rules"
+    ],
+    "sha256": {
+      "package.json": "3dbdab9e84e85586a82412b73b681c84b2834cb89da2ccb77afe26c8bf1d47a0",
+      "netlify.toml": "b2af222d96027c62e0888ca5d7f2a8dd75f21635a663fae8a43c18e53090ad42",
+      "functions/index.js": "1f10982b6fc2a9e023de7e969e5842a5b41e9bc1e6ad5fe450d9a27c748f8f33",
+      "js/admin.js": "ab76c5cd986795509e0316cfe8582e381b71125adc3e26897bcc2dc345c48537",
+      "js/services.js": "5dcfb82d366ce9ee0aa18f0764f4a0f4840ef6d9bc9b66e198cd8afa03f9e0fb",
+      "js/support.js": "8c02d73cf1acfe70d7d9f07cf322aede0fdfe4e409aa8e7ce688c4b9a632cf7b",
+      "js/company-settings.js": "af1077e78e2b818b56bbf4a255965f65f8d14057b7d3f082d997c2c9e100a000",
+      "firestore.rules": "a6f7c4b2e7ea3dd70a0c775a260cbbfa93493c301f6e5fb790046e55499df0de"
+    }
+  }
+}
