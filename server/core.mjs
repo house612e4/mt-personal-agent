@@ -1,20 +1,17 @@
+import contract from '../public/project-contract.js';
 export class AppError extends Error {
   constructor(status, message) { super(message); this.status = status; }
 }
 export class RemoteError extends AppError {
   constructor(message, definite = false) { super(502, message); this.definite = definite; }
 }
-export const accountInfo = [
-  { key: 'mt-studio', label: 'MT Studio', kind: 'page', url: 'https://www.facebook.com/mtstudioai', prefix: 'MT_STUDIO' },
-  { key: 'golapi-shop', label: 'Golapi Shop Online', kind: 'page', url: 'https://www.facebook.com/profile.php?id=61596314931955', prefix: 'GOLAPI_SHOP' },
-  { key: 'md-mahsin', label: 'Md Mahsin', kind: 'personal', url: 'https://www.facebook.com/Mahsin426' }
-];
+export const accountInfo = contract.product.accounts;
 export function account(key) {
   const result = accountInfo.find(a => a.key === key);
   if (!result) throw new AppError(400, 'অ্যাকাউন্ট সঠিক নয়।');
   return result;
 }
-export function text(value, max = 1024) {
+export function text(value, max = contract.product.maxPostLength) {
   if (typeof value !== 'string' || !value.trim() || value.length > max) throw new AppError(400, `১ থেকে ${max} অক্ষরের লেখা দিন।`);
   return value.trim();
 }
@@ -45,7 +42,7 @@ export function graphSettings(env, a) {
 }
 export async function remoteJSON(url, options = {}, label = 'সংযোগ') {
   let response;
-  try { response = await fetch(url, { ...options, signal: AbortSignal.timeout(20000) }); }
+  try { response = await fetch(url, { ...options, signal: AbortSignal.timeout(contract.flow.providerTimeoutMs) }); }
   catch { throw new RemoteError(`${label} থেকে ফল পাওয়া যায়নি।`); }
   const data = await response.json().catch(() => null);
   if (!response.ok || data?.error) {
