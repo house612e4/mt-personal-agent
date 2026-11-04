@@ -1,13 +1,13 @@
 {
   "name": "mt-personal-agent-mobile",
-  "version": "2.1.0",
+  "version": "3.1.0",
   "private": true,
   "type": "module",
   "engines": {
     "node": ">=22"
   },
   "scripts": {
-    "build": "node scripts/check.mjs && node --test",
+    "build": "node scripts/blueprints.mjs && node scripts/check.mjs && node --test",
     "test": "node --test",
     "dev": "npx netlify-cli dev"
   },

@@ -1,0 +1,1 @@
+{"indexes":[{"collectionGroup":"jobs","queryScope":"COLLECTION","fields":[{"fieldPath":"status","order":"ASCENDING"},{"fieldPath":"runAt","order":"ASCENDING"}]},{"collectionGroup":"jobs","queryScope":"COLLECTION","fields":[{"fieldPath":"status","order":"ASCENDING"},{"fieldPath":"startedAt","order":"ASCENDING"}]}],"fieldOverrides":[]}
