@@ -1,0 +1,140 @@
+# মোবাইলে MT Personal Agent v3.1 চালু করা
+
+কোডে এজেন্টের command queue, routine, brain, report ও provider adapters আছে। নিজের server/account/site সংযোগ এখনো বসানো হয়নি। নিচের setup একবার করতে হবে; এরপর মোবাইলের ব্রাউজার থেকেই কমান্ড ও দৈনিক রুটিন বদলাতে পারবেন। Secret এখানে বা chat-এ পাঠাবেন না।
+
+## ১. Agent deploy
+
+ZIP unzip করুন। GitHub private repository-র root-এ mt-personal-agent ফোল্ডারের **ভিতরের** ফাইল রাখুন; package.json ও netlify.toml root-এ থাকবে। মোবাইলে প্রয়োজন হলে GitHub Codespaces browser editor ব্যবহার করুন। ZIP ফাইলটি শুধু repository-তে upload করলে app deploy হবে না।
+
+Firebase-এ Firestore, Email/Password Authentication এবং নিজের একটি user তৈরি করুন। User UID হবে OWNER_UID। firestore.rules publish এবং firestore.indexes.json-এর দুই composite index তৈরি/deploy করুন। Firebase CLI থাকলে project নির্বাচন করে `firebase deploy --only firestore` চালানো যায়; নইলে console থেকে সমতুল্য indexes দিন। Production client access deny থাকবে।
+
+Netlify-তে GitHub repo import: build `npm run build`, publish `public`, functions `netlify/functions`, Node 22। শুধু public folder drag-and-drop নয়। Firebase Auth authorized domains-এ Netlify/custom hostname যোগ করুন।
+
+Netlify environment variables-এ Functions scope-সহ .env.example-এর প্রয়োজনীয় মান দিন এবং redeploy করুন:
+
+| মূল নাম | কোথা থেকে / কী |
+| --- | --- |
+| FIREBASE_WEB_API_KEY, FIREBASE_AUTH_DOMAIN, FIREBASE_PROJECT_ID, FIREBASE_APP_ID | Firebase project-এর web app config |
+| FIREBASE_SERVICE_ACCOUNT_JSON | Project settings → service accounts; সম্পূর্ণ JSON secret |
+| OWNER_UID | নিজের Firebase Auth user UID |
+| OPENAI_API_KEY | নিজের billed API account key |
+| INTERNAL_WORKER_SECRET | নিজের অন্তত ৩২ অক্ষরের random secret |
+| CREDENTIAL_ENCRYPTION_KEY | ৩২ random bytes-এর base64; Gmail token encryption |
+| AGENT_BASE_URL | deployed agent-এর HTTPS origin; Netlify URL env থাকলে সেটি ব্যবহৃত হয় |
+| FIREBASE_STORAGE_BUCKET | নিজের Firebase Storage bucket নাম; image upload/generation-এর জন্য |
+| DRY_RUN | প্রথমে true; বাস্তব social প্রকাশে false |
+
+Codespaces terminal-এ worker secret-এর জন্য `openssl rand -hex 32`, encryption key-এর জন্য `openssl rand -base64 32` চালাতে পারেন। ভিন্ন values দিন, server settings-এ সংরক্ষণ করুন। Encryption key হারালে/বদলালে Gmail আবার connect করতে হবে। নিজের .env বা service-account JSON GitHub-এ commit নয়। Storage provider-এর billing/quota চালু করুন; images-এর token URL যার কাছে থাকবে সে ছবিটি দেখতে পারবে। ব্যক্তিগত ছবি এভাবে প্রকাশ করবেন কি না নিজে সিদ্ধান্ত নিন।
+
+Netlify production deployment-এ pulse schedule চালু হয়েছে এবং worker-background function তৈরি হয়েছে যাচাই করুন। Pulse প্রতি পাঁচ মিনিটে due jobs চালানোর চেষ্টা করে; exact-minute delivery নয়। ফোন বন্ধ থাকলেও deployed server কাজ করবে। Server deployment/plan/scheduler না চললে শুধু PWA install দিয়ে routine চলবে না।
+
+## ২. Gmail সংযোগ
+
+Google Cloud project-এ Gmail API enable করুন। OAuth consent এবং Web application OAuth client তৈরি করুন। GOOGLE_CLIENT_ID ও GOOGLE_CLIENT_SECRET Netlify secrets-এ দিন। Authorized redirect URI হবে:
+
+`https://YOUR-AGENT-DOMAIN/.netlify/functions/gmail-oauth`
+
+সেটি deployed hostname-এর সঙ্গে একদম মিলতে হবে। Consent app testing mode হলে নিজের Gmail test user হিসেবে দিন; testing-token expiry/production verification ও refresh-token restrictions নিজের Google project-এ যাচাই করুন। Redeploy-এর পরে owner login → ব্রেন → Gmail যুক্ত করুন → নিজের Gmail-এ readonly consent। Token encrypted অবস্থায় server database-এ থাকবে। GMAIL_REFRESH_TOKEN optional fallback; সাধারণ ব্যবহারে ফাঁকা রাখুন।
+
+এখন Gmail audit সর্বশেষ এক দিনের সর্বোচ্চ ৫০ message-এর subject/from/date/snippet ও labels পড়ে। Full body/attachments পড়ে না, email পাঠায় না। “সব মেইল সম্পূর্ণ পড়েছে” দাবি করবে না।
+
+## ৩. WhatsApp Business অ্যাপ
+
+শুধু ফোনে WhatsApp Business থাকা এই server-কে chat access দেয় না। নিজের number-এর জন্য Meta/সমর্থিত provider-এর Business Platform বা Business-app coexistence onboarding সম্পন্ন করতে হবে। Onboarding availability ও number/account eligibility provider-এর কাছে যাচাই করুন।
+
+Agent env-এ WHATSAPP_PHONE_NUMBER_ID, WHATSAPP_VERIFY_TOKEN এবং META_APP_SECRET দিন। Meta webhook callback:
+
+`https://YOUR-AGENT-DOMAIN/.netlify/functions/whatsapp-webhook`
+
+একই verify token এবং প্রয়োজনীয় message/coexistence subscriptions বসান। Secret signature ও exact phone ID না মিললে data গ্রহণ হয় না। নতুন incoming events এবং provider দিলে echo/history events সংগ্রহ হয়। History events backfill হিসেবে চিহ্নিত। ফোনের পুরোনো সব chats বা media contents নিজে থেকে আসে না; বাস্তব inbound/echo coverage পরীক্ষা করে নিন।
+
+## ৪. ব্যবসার Facebook ও Instagram
+
+Meta app-এর supported META_GRAPH_VERSION দিন। MT_STUDIO_PAGE_ID/TOKEN ও GOLAPI_SHOP_PAGE_ID/TOKEN নিজের Page data দিয়ে মিলিয়ে দিন; template-এর পুরোনো IDs অন্ধভাবে বিশ্বাস নয়। Publishing/reading-এর প্রযোজ্য permissions ও app access নিজে configure করুন।
+
+Professional Instagram account ও Page connection অনুযায়ী MT_STUDIO_INSTAGRAM_ID এবং GOLAPI_SHOP_INSTAGRAM_ID দিন। এখানে Page-token-ভিত্তিক Facebook Login Graph integration আছে। Instagram feed ছবির জন্য public HTTPS JPEG/PNG URL লাগবে; app upload বা generate_image tool URL দিতে পারে। Video/reels নেই।
+
+নিজের Facebook posts audit-এর জন্য PERSONAL_FACEBOOK_USER_TOKEN ও অনুমোদিত own-post reading access প্রয়োজন। এটি Messenger/personal inbox audit নয়।
+
+সংযোগ থাকলে DRY_RUN=false করে controlled test দিন। Brain-এ automatic social permission-ও লাগবে। Default-এ autonomy flags বন্ধ। আগের manual editor-এ প্রতিটি publish-এর confirmation থাকবে; agent command/routine অনুমোদিত হলে তার আলাদা queue worker প্রকাশ করবে। Schedule agent database-এ থাকে, Meta-native schedule নয়।
+
+## ৫. দুই ওয়েবসাইটের প্রস্তুত সংযোগ
+
+এই ZIP-এর website-updates ফোল্ডারে দুই সাইটের আপডেট করা সম্পূর্ণ source ZIP আছে:
+
+- mt-studio-ai.com.zip — আপনার দেওয়া Next.js source + MT Studio bridge।
+- golapishop.online.zip — আপনার দেওয়া storefront/driver/functions source + Golapi bridge, প্রয়োজনীয় root dependency/lock এবং website CI।
+
+প্রতিটি site ZIP unzip করে তার root folder-এর ভিতরের contents **সেই সাইটের নিজের repository-তে** দিন। Agent repository-তে দুই সাইটের contents মেশাবেন না। Agent root-এর public/server/netlify ফাইল agent-এর repository-র জন্য। দুই সাইটের নতুন function deploy না হওয়া পর্যন্ত agent-এর website probe সফল হবে না।
+
+নিজের repository-তে বর্তমান source পরিবর্তিত থাকলে পুরো snapshot দিয়ে overwrite করার আগে diff দেখুন। বিকল্প installer আছে: `node scripts/install-site-bridge.mjs --site mt-studio --target /path/to/mt-studio-repo` অথবা `--site golapi-shop --target /path/to/golapi-repo`। এটি bridge files, target configuration ও test যোগ করে; অন্য app source বদলায় না। Package identity/required files যাচাই করে ও মূল logic source hash মেলায়; আগে ইনস্টলার বদলানো package/netlify configuration hash এই guard-এ ধরা হয় না। পর্যালোচিত logic আলাদা হলে পরিবর্তন করার আগে থামে। Agent zip-এর কোড Codespaces-এ রাখা হলে script চালানো যাবে।
+
+প্রত্যেক **target site-এর Netlify** environment-এ দিন:
+
+| নাম | মান |
+| --- | --- |
+| FIREBASE_SERVICE_ACCOUNT_JSON | সেই site-এর নিজের Firebase project-এর service account; agent-এর database account ধরে নেবেন না |
+| AGENT_BRIDGE_KEY | আলাদা random secret, অন্তত ৩২ অক্ষর; agent-এর সংশ্লিষ্ট *_BRIDGE_KEY-তে একই মান |
+| AGENT_BRIDGE_ALLOW_WRITES | শুরুতে false; controlled read test-এর পরে প্রয়োজনমতো true |
+| AGENT_BRIDGE_FINANCIAL_WRITES | শুরুতে false; wallet/credit/payment review/cancellation অনুমতি দিতে true |
+
+MT Studio-এর বর্তমান firebase-admin 13.6.0 রাখা হয়েছে। Golapi Netlify root-এ firebase-admin 14.5.0, patched glob override ও lock দেওয়া হয়েছে; তার আলাদা Firebase Cloud Functions package পরিবর্তন করা হয়নি। Existing site frontend login, admin session/MFA এবং Firestore client rules অপরিবর্তিত। Bridge-এর machine key পৃথক delegated access; শুধু server env-এ থাকবে।
+
+Agent env:
+
+| নাম | মান |
+| --- | --- |
+| MT_STUDIO_BRIDGE_URL | https://mt-studio-ai.com/.netlify/functions/agent-bridge |
+| GOLAPI_SHOP_BRIDGE_URL | https://golapishop.online/.netlify/functions/agent-bridge |
+| MT_STUDIO_BRIDGE_KEY, GOLAPI_SHOP_BRIDGE_KEY | সংশ্লিষ্ট site-এর key; দুই site-তে ভিন্ন key |
+
+সব deploy-এর পরে agent → Brain → “ওয়েবসাইট যাচাই” চাপুন। এটি সত্যিকারের signed request করে site/protocol/চালু actions পরীক্ষা করে। শুধু settings presence দেখে successful connection বলে না।
+
+### কোন কাজের সংযোগ আছে
+
+| সাইট | পড়া / কাজ |
+| --- | --- |
+| MT Studio | brand/policies, users, manualPayments, records, files, photo contests, competitions/claims/audit পড়া; brand/policies বদলানো; photo contest save/close; অনুমতিসাপেক্ষে payment approve/reject/reopen ও verified customer credit adjustment |
+| Golapi Shop | orders/products/users/staff/drivers/tickets/refunds/payouts/coupons/stock/procurement/campaigns/escalations/settings পড়া; existing product info/stock/price বদলানো; store settings; order note/valid status step/driver assignment; atomic cancellation; payment verification; ticket status/priority |
+
+প্রথমে capabilities, তারপর paginated list/get; প্রত্যেক update-এ exact latest revision লাগে। Page limit ১–১০, default ৫; document-ID order, latest-first নয়। Overview প্রতি নির্বাচিত resource-এর প্রথম দুই record-এর নমুনা; পূর্ণ daily totals নয়। Secret/private subcollections প্রকাশ হয় না; text/nesting/arrays capped। প্রয়োজনীয় আরও page না পড়ে “সব audit হয়েছে” বলা যাবে না।
+
+Golapi cancellation এক transaction-এ wallet/coupon/stock ও audit বদলায়; operation ID replay হলে আর টাকা/stock বদলায় না। Pickup শুরু হলে cancel blocked। Custom-bazar advance ও external bKash/Nagad/bank refund এই action ফেরত পাঠায় না; manual refund required দেখায়।
+
+MT Studio approved manual receipt-এর একই hash ব্যবহার হয়; একই receipt দিয়ে দুবার credit পাওয়া যায় না। Financial approval-এ মালিকের বাস্তব bank/receipt যাচাইয়ের reference দিতে হবে; agent-এর bank account reading নেই। সন্দেহজনক/unverified receipt approve করতে বলবেন না। পেমেন্ট status পরিবর্তন টাকা পাঠানো বা bank verification-এর সমান নয়।
+
+Golapi legacy driver-directory ID থেকে একক phone link দিয়ে active staff auth UID মেলানো হয়। একাধিক match হলে guess করে assign হয় না। ড্রাইভার accept না করলে pickup/delivery stage চালানো যায় না। Existing Firebase triggers deployed থাকলে order update-এর নিজস্ব notification/referral flow কাজ করতে পারে; bridge SMS/WhatsApp পাঠিয়েছে বলে দাবি করে না।
+
+নতুন arbitrary table, user role/permission change, customer reply, external payout/refund, delete, নতুন product creation, multi-file code refactor এবং সব ERP workflow-এর write adapter নেই। এগুলোকে implemented বলা যাবে না। Source-এর static service catalog/code পরিবর্তনের জন্য repository PR tool ব্যবহার হবে।
+
+### কোড ও deployment
+
+GITHUB_AGENT_TOKEN selected repositories-তে Contents/Pull requests write ও Checks read access দিন। *_GITHUB_REPO `owner/name` আকারে নিজের actual repository বসান। শুধু uploaded ZIP থেকে owner নির্ধারণ করা যায় না।
+
+এই source-ভিত্তিক CI check names:
+
+- MT_STUDIO_REQUIRED_CHECKS=validate — MT Studio-এর বিদ্যমান CI job।
+- GOLAPI_SHOP_REQUIRED_CHECKS=validate-agent-site — নতুন push/PR website check; আগে শুধু manual APK workflow ছিল।
+
+Brain-এ website/deploy permission, GitHub branch protection ও existing Netlify Git deployment দরকার। NETLIFY_AGENT_TOKEN এবং *_NETLIFY_SITE_ID থাকলে merge commit-এর actual deployment state poll হয়। নতুন bridge+CI deploy এবং real account test এখনো বাকি; local tests remote success-এর প্রমাণ নয়।
+
+## ৬. মোবাইল থেকে নিয়মিত ব্যবহার
+
+Owner login → Brain-এ নিজের instructions, memory, text/image models, timezone ও daily budgets ঠিক করুন। Default timezone নিজের সঙ্গে মিলিয়ে বদলান। Default daily budget ১০০ Responses call ও ৫ image; এক command-এ কয়েকটি call লাগতে পারে। Provider billing আলাদা। Model নাম লিখলেই account access পাওয়া যায় না।
+
+কমান্ডের উদাহরণ:
+
+- “Gmail, WhatsApp আর নিজের Facebook পোস্টের রিপোর্ট করো। কোন উৎস পড়তে পারোনি জানাও।”
+- “MT Studio-এর জন্য একটি Facebook পোস্ট লিখে আগামীকাল আমার timezone-এ রাত ৮টায় সিডিউল করো। অফার বানাবে না।”
+- “Golapi Shop-এর capabilities দেখে products পড়ো, তারপর এই পণ্যের description বদলাও।”
+- “এই report ID-এর লেখায় আমার নির্দেশ অনুযায়ী সংশোধন করো; মূল evidence রেখো।”
+
+Routines-এ title/command/time/timezone/days দিন। দৈনিক audit-এর routine শুধু read দিয়েই চলতে পারে। বাইরের post/website changes চাইলে routine allowWrites এবং Brain-এর সংশ্লিষ্ট permission দুটোই চালু থাকতে হবে। রুটিন pause/edit করলে পুরোনো version-এর queued কাজ cancel হয়; running action ফিরিয়ে নেওয়া যায় না।
+
+Reports-এ লেখার সঙ্গে evidence/coverage দেখুন, সম্পাদনা করুন। Agent jobs-এ ধাপ দেখুন। “ফল যাচাই প্রয়োজন” হলে বাইরের site/page-এ বাস্তব ফল দেখুন; একই কাজ তাড়াতাড়ি আবার পাঠাবেন না। Manual draft publication-এর uncertain outcome-এ অন্তত দুই মিনিট পরে owner reconciliation করুন।
+
+Android Chrome menu বা iPhone Safari Share থেকে Add to Home Screen করুন। PWA, APK নয়। Internet ছাড়া নতুন command/report fetch হবে না। Logout ব্যক্তিগত পর্দা সরায়; unsaved লেখা cloud-এ যায় না।
+
+## যাচাই ও অবশিষ্ট কাজ
+
+Agent build-এ ৮৭টি local test পাস করেছে। MT Studio source-এ ১৭টি নির্বাচিত test, Golapi bridge-এ ৩টি প্রযোজ্য test পাস (৩টি MT-only case skipped)। Full target dependency installation/build এখানে করা যায়নি—offline package cache অসম্পূর্ণ। Local automated checks mocked services/DOM দিয়ে হয়েছে; live accounts, target repositories, deployed Node 22, phone-closed routine এবং actual Android/iPhone layout পরীক্ষা বাকি। সংযোগের পাশে “সেটিং আছে” credential validity-এর প্রমাণ নয়। Plan.md-এ live activation checklist আছে। এই কোডকে credentials বসানো ও site-specific adaptation ছাড়া সম্পূর্ণ চালু ব্যক্তিগত agent বলা যাবে না।
