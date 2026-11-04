@@ -17,6 +17,9 @@
   "overrides": {
     "rimraf": {
       "glob": "14.0.3"
+    },
+    "jwks-rsa": {
+      "jose": "5.10.0"
     }
   }
 }
