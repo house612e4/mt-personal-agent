@@ -1,9 +1,7 @@
+import {mountAgent} from './agent-ui.js';
+import contract from './project-contract.js';
 const $ = id => document.getElementById(id);
-const accounts = [
-  { key: 'mt-studio', label: 'MT Studio', kind: 'page', initial: 'MT', url: 'https://www.facebook.com/mtstudioai' },
-  { key: 'golapi-shop', label: 'Golapi Shop Online', kind: 'page', initial: 'GS', url: 'https://www.facebook.com/profile.php?id=61596314931955' },
-  { key: 'md-mahsin', label: 'Md Mahsin', kind: 'personal', initial: 'MM', url: 'https://www.facebook.com/Mahsin426' }
-];
+const accounts = contract.product.accounts.map(({prefix, ...a}) => a);
 let selected = 'mt-studio', editing = null, editingVersion = 0, dirty = false;
 let drafts = [], cursor = null, demo = false, auth = null, fb = null, user = null, status = null, busy = false;
 let authReady = false, signingIn = false, sessionEpoch = 0, listEpoch = 0;
@@ -47,7 +45,7 @@ async function api(action, body = {}) {
   try {
     res = await fetch('/.netlify/functions/api?action=' + action, {
       method: 'POST', headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
-      body: JSON.stringify(body), signal: AbortSignal.timeout(60000)
+      body: JSON.stringify(body), signal: AbortSignal.timeout(contract.flow.clientTimeoutMs)
     });
   } catch { throw Error(action === 'publish' ? 'প্রকাশের উত্তর পাওয়া যায়নি। তালিকা আবার খুলে Facebook পেজে ফল যাচাই করুন।' : 'সার্ভারের উত্তর পাওয়া যায়নি। ইন্টারনেট পরীক্ষা করে তালিকা আবার খুলুন।'); }
   if (activeUser !== user || demo) throw Error('সেশন বদলেছে। আবার চেষ্টা করুন।');
@@ -58,7 +56,8 @@ async function api(action, body = {}) {
 function tab(name, refresh = true) {
   document.querySelectorAll('.tab').forEach(e => { e.hidden = e.id !== name; });
   document.querySelectorAll('[data-tab]').forEach(e => e.classList.toggle('active', e.dataset.tab === name));
-  $('pageTitle').textContent = { compose: 'নতুন পোস্ট', drafts: 'আমার খসড়া', insights: 'পেজের তথ্য', settings: 'সংযোগ ও সেটআপ' }[name];
+  $('pageTitle').textContent = { agent:'আপনার এজেন্ট',routines:'কাজের রুটিন',reports:'দৈনিক রিপোর্ট',brain:'এজেন্টের ব্রেন',compose: 'নতুন পোস্ট', drafts: 'আমার খসড়া', insights: 'পেজের তথ্য', settings: 'সংযোগ ও সেটআপ' }[name];
+  if (['agent','routines','reports','brain'].includes(name) && refresh) agentUI.refresh().catch(e=>toast(errorText(e)));
   if (name === 'drafts' && refresh) loadDrafts().catch(e => toast(errorText(e)));
   window.scrollTo({ top: 0, behavior: 'smooth' });
 }
@@ -81,7 +80,7 @@ function accountUI() {
   const a = accounts.find(a => a.key === selected); $('previewName').textContent = a.label; $('previewAvatar').textContent = a.initial;
 }
 function preview() {
-  const value = $('post').value; $('count').textContent = `${value.length} / ১০২৪`; $('previewText').textContent = value || 'আপনার লেখা এখানে দেখা যাবে।';
+  const value = $('post').value; $('count').textContent = `${value.length} / ${contract.product.maxPostLength}`; $('previewText').textContent = value || 'আপনার লেখা এখানে দেখা যাবে।';
 }
 function demoLoad() {
   try {
@@ -100,8 +99,8 @@ async function enter() {
   if (epoch !== sessionEpoch) return;
   status = next; drafts = demo ? demoLoad() : []; cursor = null;
   accountUI(); preview(); $('welcome').hidden = true; $('app').hidden = false;
-  $('mode').textContent = demo ? 'ডেমো চলছে · খসড়া শুধু এই ব্রাউজারে থাকবে · AI ও প্রকাশ বন্ধ' : status.dryRun ? 'পরীক্ষামূলক মোড · Facebook প্রকাশ বন্ধ' : 'আপনার কর্মক্ষেত্র · অনুমোদন দিলেই শুধু পোস্ট প্রকাশ হবে';
-  connections(); tab('compose'); controls();
+  $('mode').textContent = demo ? 'ডেমো চলছে · খসড়া শুধু এই ব্রাউজারে থাকবে · AI ও প্রকাশ বন্ধ' : status.dryRun ? 'পরীক্ষামূলক মোড · Facebook প্রকাশ বন্ধ' : 'আপনার কর্মক্ষেত্র · এজেন্টের অনুমতি ব্রেন সেটিংসে নিয়ন্ত্রিত';
+  connections(); tab('agent'); controls();
 }
 function connections() {
   const box = $('connections'); box.replaceChildren();
@@ -195,7 +194,7 @@ $('generate').onclick = () => run($('generate'), async () => {
   $('post').value = data.text; dirty = true; preview(); toast('লেখা তৈরি হয়েছে। দেখে খসড়া সংরক্ষণ করুন।');
 });
 $('save').onclick = () => run($('save'), async () => {
-  const value = $('post').value.trim(); if (!value || value.length > 1024) throw Error('১ থেকে ১০২৪ অক্ষরের লেখা দিন।');
+  const value = $('post').value.trim(); if (!value || value.length > contract.product.maxPostLength) throw Error(`১ থেকে ${contract.product.maxPostLength} অক্ষরের লেখা দিন।`);
   const id = editing || crypto.randomUUID(), version = editingVersion;
   editing = id;
   if (demo) {
@@ -221,6 +220,7 @@ $('loadInsights').onclick = () => run($('loadInsights'), async () => {
   }
 });
 function clearSession() {
+  agentUI.reset();
   ++sessionEpoch; ++listEpoch; user = null; drafts = []; cursor = null; editing = null; editingVersion = 0; status = null; dirty = false;
   $('post').value = ''; $('topic').value = ''; $('draftList').replaceChildren(); $('insightResult').replaceChildren(); $('connections').replaceChildren(); $('previewText').textContent = '';
   $('confirm').close(); $('recovery').close(); $('confirmText').textContent = ''; $('recoveryPostId').value = '';  $('app').hidden = true; $('welcome').hidden = false;
@@ -248,10 +248,10 @@ $('reset').onclick = () => run($('reset'), async () => {
 async function boot() {
   controls();
   try {
-    const res = await fetch('/.netlify/functions/api?action=config', { signal: AbortSignal.timeout(15000) });
+    const res = await fetch('/.netlify/functions/api?action=config', { signal: AbortSignal.timeout(contract.flow.configTimeoutMs) });
     if (!res.ok) throw Error(); const config = await res.json(); if (!config.ready) throw Error();
-    const app = await import('https://www.gstatic.com/firebasejs/11.10.0/firebase-app.js');
-    fb = await import('https://www.gstatic.com/firebasejs/11.10.0/firebase-auth.js'); auth = fb.getAuth(app.initializeApp(config.firebase));
+    const app = await import(`https://www.gstatic.com/firebasejs/${contract.tech.firebaseWebSdk}/firebase-app.js`);
+    fb = await import(`https://www.gstatic.com/firebasejs/${contract.tech.firebaseWebSdk}/firebase-auth.js`); auth = fb.getAuth(app.initializeApp(config.firebase));
     try { await fb.setPersistence(auth, fb.browserSessionPersistence); } catch { await fb.setPersistence(auth, fb.inMemoryPersistence); }
     authReady = true; $('setupNote').textContent = 'নিজের নির্ধারিত ইমেইল ও পাসওয়ার্ড দিয়ে প্রবেশ করুন।'; controls();
     fb.onAuthStateChanged(auth, async u => {
@@ -266,5 +266,12 @@ async function boot() {
   }
 }
 window.addEventListener('beforeunload', event => { if (dirty) { event.preventDefault(); event.returnValue = ''; } });
+async function agentRequest(action,body={}) {
+ if(demo)throw Error('ডেমোতে এজেন্টের cloud কাজ চলে না। লগইন ও সংযোগ সেটআপ করুন।');
+ const active=user;if(!active)throw Error('লগইন করুন।');const token=await active.getIdToken();
+ const response=await fetch('/.netlify/functions/agent?action='+action,{method:'POST',headers:{Authorization:`Bearer ${token}`,'Content-Type':'application/json'},body:JSON.stringify(body),signal:AbortSignal.timeout(30000)});
+ const data=await response.json();if(active!==user)throw Error('সেশন বদলেছে।');if(!response.ok)throw Error(data.error||'কাজ হয়নি।');return data;
+}
+const agentUI=mountAgent({request:agentRequest,lock:value=>{busy=value;controls();}});
 boot();
 if ('serviceWorker' in navigator) navigator.serviceWorker.register('/sw.js').catch(() => {});
