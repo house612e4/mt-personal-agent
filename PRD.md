@@ -46,7 +46,7 @@ Gmail audit সর্বশেষ এক দিনের সর্বোচ্�
       "label": "Golapi Shop Online",
       "kind": "page",
       "initial": "GS",
-      "url": "https://www.facebook.com/profile.php?id=61596314931955",
+      "url": "https://www.facebook.com/profile.php?id=410455022157073",
       "prefix": "GOLAPI_SHOP"
     },
     {
