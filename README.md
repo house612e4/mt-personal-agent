@@ -1,4 +1,4 @@
-# MT Personal Agent v4.0
+# আরমান v4.1.1
 
 মোবাইলের সহজ বাংলা chat থেকে কথা, ছবি, রুটিন, background কাজ এবং উৎসসহ রিপোর্ট। আরমানের চ্যাটে আজকের সংরক্ষিত কাজের হিসাব দেখায়। ছবি দিলে মূল ফাইল দিয়েই Facebook/Instagram পোস্ট কিউতে যায়। Netlify Functions + Firebase owner login/Firestore; বাস্তব provider adapters রয়েছে, account integration চালু করতে নিজের configuration দরকার।
 
@@ -14,7 +14,7 @@
 
 Node 22+, `npm ci`, `npm run build`, `.env.example` অনুযায়ী local configuration, `npm run dev`। Netlify Git deployment দরকার; public folder drag-and-drop-এ backend/scheduler তৈরি হবে না।
 
-website-updates/ ফোল্ডারে দুই আপলোড করা সাইটের bridge-সহ সম্পূর্ণ source ZIP রয়েছে; প্রতিটি তার নিজের repository-তে deploy করুন। Setup GUIDE-BN.md-এ।
+দুই সাইটের সংযোগের কোড adapters/site-bridge/ এবং স্থাপন করার script scripts/install-site-bridge.mjs-এ আছে। নিজের সাইটের বর্তমান source-এর ওপর installer চালানোর ধাপ GUIDE-BN.md-এ আছে।
 
 Code editing-এর আগে [AGENTS.md](AGENTS.md) এবং [PRD.md](PRD.md), [AppFlow.md](AppFlow.md), [UI_Spec.md](UI_Spec.md), [TRD.md](TRD.md), [Schema.md](Schema.md), [Plan.md](Plan.md) পড়ুন। Build ছয়টি JSON blueprint পড়ে runtime contract/CSS বানায়; সব বাংলা prose স্বয়ংক্রিয়ভাবে enforce হয় না।
 

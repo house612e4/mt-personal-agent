@@ -1,5 +1,7 @@
 # MT Personal Agent — App flow v3.1
 
+সাম্প্রতিক বার্তা user/assistant ভূমিকা অক্ষত রেখে AI-তে যাবে। আগের মূল ছবি পুনর্ব্যবহারে uploaded:<job-id> রেফারেন্স server যাচাই করবে।
+
 v3.1 website flow: live capabilities → resource.list/get → exact revision + typed action → transaction-এ operation/audit/result commit। Conflict হলে reread; একই operation ID-তে অন্য input নয়। Target write/financial flags-ও যাচাই হবে।
 
 

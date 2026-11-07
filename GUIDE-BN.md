@@ -69,14 +69,9 @@ Professional Instagram account ও Page connection অনুযায়ী MT_STUD
 
 ## ৫. দুই ওয়েবসাইটের প্রস্তুত সংযোগ
 
-এই ZIP-এর website-updates ফোল্ডারে দুই সাইটের আপডেট করা সম্পূর্ণ source ZIP আছে:
+এই ZIP-এ দুই সাইটের bridge কোড ও installer আছে। সংশ্লিষ্ট সাইটের বর্তমান source repository-তে সংযোগ স্থাপন করতে হবে।
 
-- mt-studio-ai.com.zip — আপনার দেওয়া Next.js source + MT Studio bridge।
-- golapishop.online.zip — আপনার দেওয়া storefront/driver/functions source + Golapi bridge, প্রয়োজনীয় root dependency/lock এবং website CI।
-
-প্রতিটি site ZIP unzip করে তার root folder-এর ভিতরের contents **সেই সাইটের নিজের repository-তে** দিন। Agent repository-তে দুই সাইটের contents মেশাবেন না। Agent root-এর public/server/netlify ফাইল agent-এর repository-র জন্য। দুই সাইটের নতুন function deploy না হওয়া পর্যন্ত agent-এর website probe সফল হবে না।
-
-নিজের repository-তে বর্তমান source পরিবর্তিত থাকলে পুরো snapshot দিয়ে overwrite করার আগে diff দেখুন। বিকল্প installer আছে: `node scripts/install-site-bridge.mjs --site mt-studio --target /path/to/mt-studio-repo` অথবা `--site golapi-shop --target /path/to/golapi-repo`। এটি bridge files, target configuration ও test যোগ করে; অন্য app source বদলায় না। Package identity/required files যাচাই করে ও মূল logic source hash মেলায়; আগে ইনস্টলার বদলানো package/netlify configuration hash এই guard-এ ধরা হয় না। পর্যালোচিত logic আলাদা হলে পরিবর্তন করার আগে থামে। Agent zip-এর কোড Codespaces-এ রাখা হলে script চালানো যাবে।
+Installer চালান: `node scripts/install-site-bridge.mjs --site mt-studio --target /path/to/mt-studio-repo` অথবা `--site golapi-shop --target /path/to/golapi-repo`। এটি bridge files, target configuration ও test যোগ করে; অন্য app source বদলায় না। Package identity/required files যাচাই করে ও মূল logic source hash মেলায়; আগে ইনস্টলার বদলানো package/netlify configuration hash এই guard-এ ধরা হয় না। পর্যালোচিত logic আলাদা হলে পরিবর্তন করার আগে থামে। Agent zip-এর কোড Codespaces-এ রাখা হলে script চালানো যাবে।
 
 প্রত্যেক **target site-এর Netlify** environment-এ দিন:
 
@@ -147,3 +142,9 @@ Android Chrome menu বা iPhone Safari Share থেকে Add to Home Screen �
 ## যাচাই ও অবশিষ্ট কাজ
 
 `npm run build` চালালে বর্তমান প্যাকেজের স্বয়ংক্রিয় পরীক্ষার ফল দেখা যাবে। Local automated checks mocked services/DOM দিয়ে হয়েছে; live accounts, target repositories, deployed Node 22, phone-closed routine এবং actual Android/iPhone layout পরীক্ষা deploy-এর পরে বাকি। Settings-এ Facebook-এর “লাইভ যাচাই” button token ও Page ID দিয়ে সত্যিকারের Graph request করে। এই কোডকে credentials, provider permissions ও live validation ছাড়া সম্পূর্ণ চালু ব্যক্তিগত agent বলা যাবে না।
+
+## অনুবাদ ও Netlify ব্যাজ
+
+পেজে translate="no" এবং notranslate নির্দেশ দেওয়া আছে। Browser নিজস্ব অনুবাদের বার দেখালে × চেপে বন্ধ করুন। ব্রাউজারের “এই ভাষা অনুবাদ করবে না” পছন্দ থাকলে বাংলা বাছতে পারেন।
+
+Powered by Netlify ব্যাজ hosting থেকে যুক্ত হয়। নিজের Netlify project → Project configuration → General → Powered by Netlify badge বন্ধ করে Save করুন। পরেরবার পেজ খুললেই নতুন সেটিং কার্যকর হবে। [Netlify-এর নিয়ম](https://docs.netlify.com/manage/projects/powered-by-netlify-badge/)

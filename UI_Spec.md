@@ -1,5 +1,7 @@
 # MT Personal Agent — UI specification v3.1
 
+চ্যাটে ছোট সময়, সংক্ষিপ্ত placeholder, অন্তর্নিহিত কাজের নিয়ম পর্দায় দেখানো হবে না। কাজের বিস্তারিত বন্ধ details-এর ভেতরে থাকবে। বাংলা পেজে translate=no ও notranslate থাকবে।
+
 v3.1: Brain-এর connection অংশে প্রত্যেক website-এর বাস্তব signed probe button ও তার ফল। Setting উপস্থিতি এবং actual probe আলাদা করে দেখাবে।
 
 

@@ -1,5 +1,7 @@
 # MT Personal Agent — Implementation plan v4.0
 
+এই সংশোধনে কথোপকথনের history, পুরোনো সংযুক্ত ছবি রেফারেন্স এবং সাধারণ চ্যাটের উপস্থাপনার regression যাচাই করতে হবে।
+
 v4.0 ধাপ: chat-first UI → অপরিবর্তিত ছবি সংযুক্তি → সংরক্ষিত আজকের কাজ → এক কমান্ডে একটি social queue handoff → live Facebook probe → mobile layout → automated validation। Target site production audit/full mobile device test সম্পন্ন দাবি নয়।
 
 

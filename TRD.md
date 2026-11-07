@@ -1,11 +1,13 @@
 # MT Personal Agent — Technical requirements v3.1
 
+এই সংশোধনে নতুন provider call যোগ হয় না। Netlify-এর hosting badge বন্ধ করতে Project configuration > General > Powered by Netlify badge সেটিং লাগে। Browser translation-এর UI browser নিয়ন্ত্রণ করে।
+
 v3.1: adapters/site-bridge engine + source-specific overlay installer। MT Studio-এর existing pure TS validators Netlify esbuild bundle-এ reuse; Golapi root-এ pinned firebase-admin 14.5.0 ও lock লাগবে। Bridge target authentication HMAC; মানুষের session/MFA ব্যবস্থা অপরিবর্তিত।
 
 
 ## স্থির stack
 
-Vanilla ES modules frontend/PWA; Netlify Node Functions; Firebase Authentication, server-only Firestore, ঐচ্ছিক Firebase Storage। package.json version 4.1.0। Exact SDK/override versions ও deployment directories নিচের machine block-এ; package-lock.json authoritative। Build target Node 22+, বর্তমান v3 local automated validation Node 24-এ হয়েছে; Node 22 ও hosted build validation বাকি।
+Vanilla ES modules frontend/PWA; Netlify Node Functions; Firebase Authentication, server-only Firestore, ঐচ্ছিক Firebase Storage। package.json version 4.1.1। Exact SDK/override versions ও deployment directories নিচের machine block-এ; package-lock.json authoritative। Build target Node 22+, বর্তমান v3 local automated validation Node 24-এ হয়েছে; Node 22 ও hosted build validation বাকি।
 
 ## runtime ও API
 

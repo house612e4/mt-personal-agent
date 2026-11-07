@@ -1,5 +1,7 @@
 # MT Personal Agent — Schema v3.1
 
+নতুন command job-এ taskActivity boolean থাকবে। সাধারণ সফল কথোপকথন আজকের কাজের তালিকায় গণনা হবে না। পুরোনো job-এর taskActivity না থাকলে আগের ফল রাখা হয়।
+
 v3.1 site schema: MT Studio settings/brand, settings/policies, users, records, files, manualPayments, contests, competitions; Golapi orders, products, users, staff, setting, support_tickets এবং যাচাইকৃত ERP collections। _agent_operations, _agent_audit, _agent_nonces target database-এ। Raw update/delete নয়; data hash revision ও transaction।
 
 
