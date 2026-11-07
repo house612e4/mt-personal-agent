@@ -35,7 +35,7 @@ export function createAgentService({db,uid,env=process.env,http=remoteJSON,conne
  async function execute(job,{deadline=Date.now()+10*60000}={}){
   const checkTime=()=>{if(Date.now()+5*60000>deadline)throw new AppError(408,'Worker-এর সময়সীমার জন্য নতুন ধাপ শুরু করা হয়নি। ধাপ ও বাইরের ফল যাচাই করুন।');};
   checkTime();
-  const brain=await store.brain();let wrote=false,toolErrors=0;const attempted=new Set();
+  const brain=await store.brain();let wrote=false,toolErrors=0,taskActivity=false;const attempted=new Set();
   const once=value=>{const id=stableId(JSON.stringify(value));if(attempted.has(id))throw new AppError(409,'একই বাইরের পরিবর্তন এই কাজে আবার চেষ্টা করা যাবে না। ফল যাচাই করুন।');attempted.add(id);};
   if(job.kind==='merge'){
    requireWrite(brain,job,'website');if(!brain.automaticDeploy)throw new AppError(403,'স্বয়ংক্রিয় merge/deploy অনুমতি বন্ধ আছে।');
@@ -50,7 +50,10 @@ export function createAgentService({db,uid,env=process.env,http=remoteJSON,conne
    await store.trace(job.id,{tool:'social_publish',phase:'starting',platform:job.payload.platform});
    const result=await connectors.publish(job.payload);return bossReply(`পোস্ট প্রকাশ হয়েছে। আইডি ${result.id}।`);
   }
+  const previous=(await store.list('jobs','createdAt',20)).filter(x=>x.id!==job.id&&(!x.kind||x.kind==='command')&&x.payload?.command&&!['queued','running','cancelled'].includes(x.status)&&(!job.createdAt||x.createdAt<=job.createdAt)).slice(0,10);
+  const attachments=new Map(previous.filter(x=>x.payload.media?.url).map(x=>[x.id,x.payload.media]));
   const tools=async(name,b,callId)=>{
+   taskActivity=true;
    checkTime();
    if(name==='audit_sources'){
     if(!Array.isArray(b.sources)||b.sources.length>5)throw new AppError(400,'সর্বোচ্চ পাঁচটি উৎস বাছুন।');
@@ -60,15 +63,19 @@ export function createAgentService({db,uid,env=process.env,http=remoteJSON,conne
    }
    if(name==='prepare_post'){
     if(!SITES[b.accountKey]||!['facebook','instagram'].includes(b.platform))throw new AppError(400,'Business account/platform সঠিক নয়।');
-    if(b.imageUrl==='uploaded'&&!job.payload.media?.url)throw new AppError(400,'পোস্টের ছবি সংযুক্ত করুন।');
-    const imageUrl=job.payload.media?.url||publicMedia(b.imageUrl);if(b.platform==='instagram'&&!imageUrl)throw new AppError(400,'Instagram-এর জন্য ছবি প্রয়োজন। ছবি সংযুক্ত করুন।');
+    const reference=typeof b.imageUrl==='string'&&b.imageUrl.startsWith('uploaded:')?b.imageUrl.slice(9):null;
+    const earlier=reference?attachments.get(reference):attachments.values().next().value;
+    if(reference&&!earlier&&!job.payload.media?.url)throw new AppError(400,'আগের ছবিটি এই কথোপকথনে পাওয়া যাচ্ছে না। ছবিটি আবার দাও।');
+    const original=job.payload.media||((b.imageUrl==='uploaded'||reference)?earlier:null);
+    if((b.imageUrl==='uploaded'||reference)&&!original?.url)throw new AppError(400,'ছবিটি সংযুক্ত করে পাঠাও।');
+    const imageUrl=original?.url||publicMedia(b.imageUrl);if(b.platform==='instagram'&&!imageUrl)throw new AppError(400,'Instagram-এর জন্য ছবি প্রয়োজন। ছবি সংযুক্ত করুন।');
     const caption=imageUrl&&b.caption===''?'':bounded(b.caption,2000);let runAt=new Date().toISOString();
     if(b.scheduleAt){if(!/(Z|[+-]\d{2}:\d{2})$/.test(b.scheduleAt)||!Number.isFinite(Date.parse(b.scheduleAt)))throw new AppError(400,'সিডিউলে timezone offset বা Z দিতে হবে।');if(Date.parse(b.scheduleAt)<Date.now()-60000)throw new AppError(400,'ভবিষ্যতের সময় দিন।');runAt=new Date(b.scheduleAt).toISOString();}
     // Scheduling is a write authorization, not a fabricated provider-native schedule.
     requireWrite(brain,job,'social');
     wrote=true;
     const result=await store.enqueue({id:stableId(job.id+':post'),kind:'social',payload:{accountKey:b.accountKey,platform:b.platform,caption,imageUrl,parentJobId:job.id},runAt,routineId:job.routineId,routineVersion:job.routineVersion,allowWrites:job.allowWrites});
-    return{...result,runAt,caption,platform:b.platform,chatReply:'পোস্টটি কিউতে রাখা হয়েছে। প্রকাশের অবস্থা আজকের কাজে দেখবেন।'};
+    return{...result,runAt,caption,platform:b.platform,chatReply:'পোস্টের ব্যবস্থা করেছি। প্রকাশ হলে আজকের কাজে দেখাবে।'};
    }
    if(name==='website_action'){
     const action=String(b.action),info=actionInfo(b.site,action);if(!info)throw new AppError(400,'এই সাইটে action নেই। আগে capabilities পড়ুন।');const write=info.write;
@@ -104,13 +111,16 @@ export function createAgentService({db,uid,env=process.env,http=remoteJSON,conne
    throw new AppError(400,'এই টুল নেই।');
   };
   try{
-   const history=(await store.list('jobs','createdAt',10)).filter(x=>x.status==='succeeded'&&x.payload?.command).reverse().map(x=>x.payload.command+'\nআগের ফল: '+String(x.result||'').slice(0,2000));
+   const history=[...previous].reverse().flatMap(x=>[
+    {role:'user',content:x.payload.command+(x.payload.media?.url?`\n[সংযুক্ত মূল ছবি: uploaded:${x.id}]`:'')},
+    ...(x.result?[{role:'assistant',content:String(x.result).slice(0,4000)}]:[])
+   ]);
    const result=await agentLoop({brain,command:bounded(job.payload.command,6000),media:job.payload.media||null,history,request:payload=>{checkTime();return ai(payload);},runTool:tools,trace:async value=>{if(!value.ok)toolErrors++;await store.trace(job.id,value);}});
-   return{result,status:toolErrors?'attention':'succeeded'};
-  }catch(e){e.uncertain=wrote;throw e;}
+   return{result,status:toolErrors?'attention':'succeeded',taskActivity};
+  }catch(e){e.uncertain=wrote;e.taskActivity=taskActivity;throw e;}
  }
- async function finishJob(job,status,result){
-  await store.finish(job.id,status,result);
+ async function finishJob(job,status,result,taskActivity){
+  await store.finish(job.id,status,result,taskActivity);
   const {source,replyTo}=job.payload||{};
   if(!['whatsapp','telegram'].includes(source)||!replyTo||job.replyStatus)return;
   let replyStatus;
@@ -126,8 +136,8 @@ export function createAgentService({db,uid,env=process.env,http=remoteJSON,conne
   drain:async()=>{
    const started=Date.now();const snap=await store.col('jobs').where('status','==','queued').where('runAt','<=',new Date().toISOString()).orderBy('runAt','asc').limit(contract.product.agent.workerBatchSize).get();let processed=0;
    for(const row of snap.docs){if(Date.now()-started>7*60000)break;const job=await store.claim(row.id);if(!job)continue;
-    try{const out=await execute(job,{deadline:started+10*60000});if(out?.status==='deferred'){const polls=(job.polls||0)+1;if(polls>=24)await finishJob(job,'blocked',out.result+' — পরবর্তী যাচাইয়ের সীমা শেষ।');else await store.col('jobs').doc(job.id).update({status:'queued',runAt:new Date(Date.now()+5*60000).toISOString(),polls,result:out.result});}else await finishJob(job,out?.status||'succeeded',out?.result||out);}
-    catch(e){const status=e.uncertain?'uncertain':e.status===503||e.status===403||e.status===409?'blocked':['social','merge'].includes(job.kind)?'uncertain':'failed';await finishJob(job,status,e.status?e.message:'কাজ সম্পন্ন হয়নি। trace ও সংযোগ পরীক্ষা করুন।');}
+    try{const out=await execute(job,{deadline:started+10*60000});if(out?.status==='deferred'){const polls=(job.polls||0)+1;if(polls>=24)await finishJob(job,'blocked',out.result+' — পরবর্তী যাচাইয়ের সীমা শেষ।');else await store.col('jobs').doc(job.id).update({status:'queued',runAt:new Date(Date.now()+5*60000).toISOString(),polls,result:out.result});}else await finishJob(job,out?.status||'succeeded',out?.result||out,out?.taskActivity);}
+    catch(e){const status=e.uncertain?'uncertain':e.status===503||e.status===403||e.status===409?'blocked':['social','merge'].includes(job.kind)?'uncertain':'failed';await finishJob(job,status,e.status?e.message:'কাজটি শেষ হয়নি। বিস্তারিত দেখে নাও।',e.taskActivity);}
     processed++;
    }return{processed};
   }

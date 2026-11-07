@@ -21,7 +21,7 @@ export function createStore(db,uid){
     if(fields.some(field=>job[field]&&localDate(Date.parse(job[field]),timezone)===date))jobs.set(doc.id,{...job,id:doc.id});
    }
    const parents=new Set([...jobs.values()].map(job=>job.payload?.parentJobId).filter(Boolean));
-   return [...jobs.values()].filter(job=>!parents.has(job.id)).sort((a,b)=>b.createdAt.localeCompare(a.createdAt)).map(job=>({
+   return [...jobs.values()].filter(job=>!parents.has(job.id)&&!(job.kind==='command'&&job.status==='succeeded'&&job.taskActivity===false)).sort((a,b)=>b.createdAt.localeCompare(a.createdAt)).map(job=>({
     id:job.id,status:job.status,runAt:job.runAt,createdAt:job.createdAt,routineId:job.routineId||null,
     title:job.payload?.command?.slice(0,160)||(job.kind==='social'?`${job.payload.platform} · ${job.payload.accountKey}`:job.kind==='merge'?'কোড পরিবর্তন':'ডেপ্লয় যাচাই')
    }));
@@ -45,7 +45,7 @@ export function createStore(db,uid){
     if(d.routineId&&(!routine?.enabled||routine.version!==d.routineVersion)){tx.update(ref,{status:'cancelled',finishedAt:new Date().toISOString()});return null;}
     tx.update(ref,{status:'running',startedAt:new Date().toISOString()});return{...d,id};
    }),
-  finish:async(id,status,result)=>col('jobs').doc(id).update({status,result:String(result).slice(0,30000),finishedAt:new Date().toISOString()}),
+  finish:async(id,status,result,taskActivity)=>col('jobs').doc(id).update({status,result:String(result).slice(0,30000),finishedAt:new Date().toISOString(),...(typeof taskActivity==='boolean'?{taskActivity}:{})}),
   trace:async(id,value)=>col('jobs').doc(id).collection('trace').add(JSON.parse(JSON.stringify({...value,createdAt:new Date().toISOString()}))),
   saveReport:async({title,body,evidence})=>{const ref=col('reports').doc(randomUUID());await ref.set({title,body,evidence:JSON.parse(JSON.stringify(evidence)),version:1,createdAt:new Date().toISOString(),updatedAt:new Date().toISOString()});return{id:ref.id,title,body,evidence};},
   editReport:async b=>{const ref=col('reports').doc(b.id);await db.runTransaction(async tx=>{const s=await tx.get(ref);if(!s.exists)throw new AppError(404,'রিপোর্ট পাওয়া যায়নি।');const old=s.data();versionCheck(old,b.expectedVersion);tx.set(ref.collection('history').doc(String(old.version)),{...old,savedAt:new Date().toISOString()});tx.update(ref,{body:bounded(b.body,30000),version:old.version+1,updatedAt:new Date().toISOString()});});return{ok:true};}
