@@ -66,3 +66,15 @@ test('calendar is loaded only when opened and clears its data at logout',async()
  assert.match(f.nodes.get('calendarEntries').children[0].textContent,/পোস্ট/);
  f.ui.reset();assert.equal(calendar.open,false);assert.equal(f.nodes.get('calendarEntries').children.length,0);
 });
+
+test('successful conversation has no task status, debug button or credit instructions in the chat',async()=>{
+ const f=fixture(async()=>({...initial(),jobs:[{id:'chat-123',kind:'command',status:'succeeded',taskActivity:false,
+  createdAt:'2026-11-07T10:00:00Z',payload:{command:'আছো?'},result:'বস, আছি। বলো।'}]}));
+ await f.ui.refresh();
+ const nodes=descendants(f.nodes.get('agentJobs'));
+ assert.ok(nodes.some(node=>node.textContent==='বস, আছি। বলো।'));
+ assert.ok(!nodes.some(node=>['কাজের ফল পাওয়া গেছে','ধাপ','বিস্তারিত'].includes(node.textContent)));
+ const html=readFileSync(new URL('../public/index.html',import.meta.url),'utf8');
+ assert.match(html,/<html[^>]+translate="no"/);assert.match(html,/<meta name="google" content="notranslate">/);
+ assert.doesNotMatch(html,/id="agentConnection"/);
+});

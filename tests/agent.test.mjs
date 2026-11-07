@@ -61,7 +61,7 @@ test('one interpretation call queues a single original photo even when the model
  const original='https://example.com/original.png';
  const command=await f.store.enqueue({payload:{command:'মূল ছবি MT Studio ফেসবুকে পোস্ট দাও',media:{url:original}}});
  await service.drain();
- assert.equal(calls,1);assert.equal((await f.store.get('jobs',command.id)).result,'বস, পোস্টটি কিউতে রাখা হয়েছে। প্রকাশের অবস্থা আজকের কাজে দেখবেন।');
+ assert.equal(calls,1);assert.equal((await f.store.get('jobs',command.id)).result,'বস, পোস্টের ব্যবস্থা করেছি। প্রকাশ হলে আজকের কাজে দেখাবে।');
  const posts=(await f.store.list('jobs')).filter(job=>job.kind==='social');
  assert.equal(posts.length,1);assert.equal(posts[0].payload.imageUrl,original);assert.equal(posts[0].payload.caption,'');
  const firestore=getFirestore(initializeApp({projectId:'local-arman-validation'},'local-arman-photo'));
@@ -191,4 +191,36 @@ test('monthly calendar reads local month boundaries and excludes stale routine j
   {time:'2026-12-01T04:30:00.000Z',title:'পরের রুটিন'}
  ]);
  await assert.rejects(()=>service.calendar('2026-13'),/মাস সঠিক নয়/);
+});
+
+test('conversation keeps speaker roles and carries a previous original photo into an explicit follow-up',async()=>{
+ const f=fixture(),original='https://example.com/original-upload.png';
+ await f.store.saveBrain({...DEFAULT_BRAIN,automaticSocial:true,expectedVersion:0});
+ const prior=await f.store.enqueue({payload:{command:'এই ছবিটি ব্যবহার করবে',media:{url:original,contentType:'image/png'}}});
+ await f.store.finish(prior.id,'succeeded','বস, ছবিটি পেয়েছি।',false);
+ let payload;
+ const service=createAgentService({db:f.db,uid:'owner',env:{OPENAI_API_KEY:'test'},connectors:{},http:async(url,opt)=>{
+  payload=JSON.parse(opt.body);
+  return{output:[{type:'function_call',name:'prepare_post',call_id:'post',arguments:JSON.stringify({
+   accountKey:'mt-studio',platform:'facebook',caption:'',imageUrl:`uploaded:${prior.id}`,scheduleAt:''
+  })}]};
+ }});
+ const out=await service.execute({id:'new-message-12345',kind:'command',payload:{command:'আগের ছবিটা ফেসবুকে পোস্ট করো'}});
+ assert.deepEqual(payload.input.slice(0,2).map(message=>message.role),['user','assistant']);
+ assert.equal(payload.input[1].content,'বস, ছবিটি পেয়েছি।');
+ assert.match(payload.input[0].content,new RegExp(`uploaded:${prior.id}`));
+ assert.equal(out.taskActivity,true);
+ const post=(await f.store.list('jobs')).find(job=>job.kind==='social');assert.equal(post.payload.imageUrl,original);
+});
+
+test('a chat-only reply is stored as conversation and excluded from todays task count',async()=>{
+ const f=fixture();
+ const service=createAgentService({db:f.db,uid:'owner',env:{OPENAI_API_KEY:'test'},connectors:{},http:async()=>({output:[{
+  type:'message',content:[{type:'output_text',text:'বস, বস, আছি। বলো।'}]
+ }]})});
+ const command=await f.store.enqueue({payload:{command:'তুমি কি আমার সঙ্গে আছো'}});
+ await service.drain();
+ const saved=await f.store.get('jobs',command.id);
+ assert.equal(saved.result,'বস, আছি। বলো।');assert.equal(saved.taskActivity,false);
+ assert.deepEqual(await f.store.todayJobs('America/New_York'),[]);
 });
