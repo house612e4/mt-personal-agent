@@ -2,13 +2,13 @@ import contract from './project-contract.js';
 export function mountAgent({request,lock=()=>{}}){
  const $=id=>document.getElementById(id),el=(tag,cls,text)=>{const e=document.createElement(tag);if(cls)e.className=cls;if(text!==undefined)e.textContent=text;return e;};
  let state=null,busy=false,brainDirty=false,brainVersion=0,editReport=null,pending=null,attachment=null,timer=null,epoch=0,polling=false,calendarMonth=null,calendarRequest=0;
- const {name,creditRule}=contract.product.agent;
+ const {name}=contract.product.agent;
  const avatarKey='mt-personal-agent-avatar';
- const boss=text=>/^বস(?:[।,!?\s]|$)/u.test(String(text).trim())?String(text).trim():`বস, ${text}`;
+ const boss=text=>`বস, ${String(text).trim().replace(/^(?:বস(?:[।,!?\s]+|$))+/u,'').trim()}`;
  const isPending=job=>job.status==='running'||job.status==='queued'&&Date.parse(job.runAt)<=Date.now();
- const names={queued:'অপেক্ষমাণ',running:'চলছে',succeeded:'কাজের ফল পাওয়া গেছে',attention:'কিছু কাজে সমস্যা',failed:'ব্যর্থ',blocked:'সংযোগ/অনুমতি বাকি',uncertain:'ফল যাচাই প্রয়োজন',cancelled:'বাতিল'};
- function notice(text){$('agentNotice').textContent=boss(text);}
- async function run(button,fn){if(busy)return;busy=true;lock(true);const old=button.textContent;button.disabled=true;button.textContent='অপেক্ষা করুন…';try{await fn();}catch(e){notice(e.message||'কাজ হয়নি।');}finally{button.textContent=old;busy=false;lock(false);}}
+ const names={queued:'অপেক্ষমাণ',running:'চলছে',succeeded:'সম্পন্ন',attention:'কিছু কাজে সমস্যা',failed:'ব্যর্থ',blocked:'সংযোগ/অনুমতি বাকি',uncertain:'ফল যাচাই প্রয়োজন',cancelled:'বাতিল'};
+ function notice(text){$('agentNotice').textContent=text;}
+ async function run(button,fn){if(busy)return;busy=true;lock(true);const old=button.textContent;button.disabled=true;button.textContent='একটু দাঁড়াও…';try{await fn();}catch(e){notice(e.message||'কাজ হয়নি।');}finally{button.textContent=old;busy=false;lock(false);}}
  function action(box,label,fn,cls='secondary'){const b=el('button',cls,label);b.type='button';b.onclick=()=>run(b,fn);box.append(b);return b;}
  function brainForm(b){brainVersion=b.version;for(const [id,key] of [['brainModel','model'],['brainInstructions','instructions'],['brainMemory','memory'],['brainZone','timezone'],['brainSteps','maxSteps'],['brainDailyCalls','dailyAiCalls']])$(id).value=b[key];$('brainSocial').checked=b.automaticSocial;$('brainWebsite').checked=b.automaticWebsite;$('brainDeploy').checked=b.automaticDeploy;const box=$('brainTools');box.replaceChildren(el('legend','','চালু টুলগুলো'));for(const name of contract.product.agent.tools){const label=el('label'),c=el('input');c.type='checkbox';c.value=name;c.checked=b.enabledTools.includes(name);label.append(c,el('span','',name));box.append(label);}}
  function routineForm(r){$('routineId').value=r?.id||'';$('routineVersion').value=r?.version||0;$('routineTitle').value=r?.title||'';$('routineCommand').value=r?.command||'';$('routineTime').value=r?.time||'20:00';$('routineZone').value=r?.timezone||state?.brain?.timezone||Intl.DateTimeFormat().resolvedOptions().timeZone;$('routineEnabled').checked=r?.enabled!==false;$('routineWrites').checked=r?.allowWrites===true;document.querySelectorAll('#routineDays input').forEach(c=>c.checked=(r?.days||[0,1,2,3,4,5,6]).includes(Number(c.value)));}
@@ -33,18 +33,44 @@ export function mountAgent({request,lock=()=>{}}){
  }
  function render(){
   renderToday();
-  const jobs=$('agentJobs');jobs.replaceChildren();if(!state.jobs.length)jobs.append(el('div','chat-empty','আপনার কাজটি নিচে লিখুন। এজেন্ট প্রয়োজন হলে ছোট প্রশ্ন করবে।'));
+  const jobs=$('agentJobs');
+  const nearBottom=jobs.scrollHeight-jobs.scrollTop-jobs.clientHeight<80;
+  const firstRender=!jobs.children.length;
+  jobs.replaceChildren();
+  if(!state.jobs.length)jobs.append(el('div','chat-empty','বস, বলো। কী নিয়ে শুরু করব?'));
   for(const j of [...state.jobs].reverse()){
-   const mine=el('article','chat-row mine'),userBubble=el('div','chat-bubble user-bubble');userBubble.append(el('p','',j.payload?.command||(j.kind==='merge'?`কোড পরিবর্তন #${j.payload.prNumber} merge যাচাই`:j.kind==='deployment'?'Live deployment যাচাই':`${j.payload?.platform||''} পোস্ট`)));
-   if(j.payload?.media?.url){const image=el('img','chat-image');image.src=j.payload.media.url;image.alt='সংযুক্ত ছবি';userBubble.append(image);}
-   userBubble.append(el('small','',new Date(j.createdAt).toLocaleString('bn-BD')));mine.append(userBubble);jobs.append(mine);
-   const theirs=el('article','chat-row agent'),reply=el('div','chat-bubble agent-bubble'),status=el('p','job-status',names[j.status]||j.status);reply.append(status);
-   if(j.result)reply.append(el('p','job-result',boss(j.result)));else if(['queued','running'].includes(j.status))reply.append(el('p','muted',boss(j.status==='queued'?'কাজটি অপেক্ষায় আছে…':'কাজটি করছি…')));
-   if(!j.result&&!['queued','running'].includes(j.status))status.textContent=boss(status.textContent);
-   if(['unconfirmed','skipped'].includes(j.replyStatus))reply.append(el('p','muted',boss('বাইরের চ্যাটে উত্তর পৌঁছানোর নিশ্চয়তা পাওয়া যায়নি।')));
-   if(j.kind==='social')reply.append(el('p','muted',`নির্ধারিত সময়: ${new Date(j.runAt).toLocaleString('bn-BD')} · ${j.payload?.accountKey}`),el('p','job-result',j.payload?.caption||''));
-   const a=el('div','chat-message-actions');action(a,'ধাপ',async()=>{const d=await request('trace',{id:j.id});$('tracePanel').hidden=false;$('agentTrace').textContent=JSON.stringify(d.trace,null,2);});if(['blocked','failed'].includes(j.status))action(a,'আবার চালান',async()=>{await request('retry',{id:j.id});await refresh();});if(j.status==='queued')action(a,'বাতিল',async()=>{await request('cancel',{id:j.id});await refresh();},'quiet danger');reply.append(a);theirs.append(reply);jobs.append(theirs);
+   const command=j.kind==='command'||!j.kind;
+   const time=value=>new Date(value).toLocaleTimeString('bn-BD',{timeZone:state.brain.timezone,hour:'numeric',minute:'2-digit'});
+   if(command){
+    const row=el('article','chat-row mine'),bubble=el('div','chat-bubble user-bubble');
+    bubble.append(el('p','',j.payload?.command||''));
+    if(j.payload?.media?.url){
+     const image=el('img','chat-image');image.src=j.payload.media.url;image.alt='তোমার পাঠানো ছবি';bubble.append(image);
+    }
+    const stamp=el('small','chat-time',time(j.createdAt));stamp.title=new Date(j.createdAt).toLocaleString('bn-BD');
+    bubble.append(stamp);row.append(bubble);jobs.append(row);
+   }
+   const row=el('article',command?'chat-row agent':'chat-row agent chat-event');
+   const reply=el('div','chat-bubble agent-bubble');
+   if(j.result)reply.append(el('p','job-result',boss(j.result)));
+   else if(['queued','running'].includes(j.status))reply.append(el('p','chat-wait',j.status==='queued'?'বার্তাটা পেয়েছি, বস…':'দেখছি, বস…'));
+   else reply.append(el('p','job-result',boss(names[j.status]||'এই কাজের ফল পাওয়া যাচ্ছে না।')));
+   if(j.status!=='succeeded'&&j.result)reply.append(el('small','job-status',names[j.status]||j.status));
+   if(['unconfirmed','skipped'].includes(j.replyStatus))reply.append(el('small','job-status','বাইরের চ্যাটে উত্তর পৌঁছানো নিশ্চিত হয়নি।'));
+   if(j.taskActivity!==false||!command||j.status!=='succeeded'){
+    const details=el('details','chat-details'),actions=el('div','chat-message-actions');
+    details.append(el('summary','','বিস্তারিত'));
+    action(actions,'কী হয়েছে দেখো',async()=>{
+     const d=await request('trace',{id:j.id});$('tracePanel').hidden=false;$('agentTrace').textContent=JSON.stringify(d.trace,null,2);
+    });
+    if(['blocked','failed'].includes(j.status))action(actions,'আবার চেষ্টা',async()=>{await request('retry',{id:j.id});await refresh();});
+    if(j.status==='queued')action(actions,'বাতিল',async()=>{await request('cancel',{id:j.id});await refresh();},'quiet danger');
+    if(j.kind==='social')details.append(el('p','',`${j.payload?.accountKey} · ${new Date(j.runAt).toLocaleString('bn-BD',{timeZone:state.brain.timezone})}`));
+    details.append(actions);reply.append(details);
+   }
+   row.append(reply);jobs.append(row);
   }
+  if(firstRender||nearBottom)jobs.scrollTop=jobs.scrollHeight;
   const routines=$('routineList');routines.replaceChildren();for(const r of state.routines){const c=el('article','panel');c.append(el('h2','',r.title),el('p','',r.command),el('p','muted',`${r.enabled?'চালু':'বন্ধ'} · ${r.time} · ${r.timezone} · পরের সময়: ${new Date(r.nextRunAt).toLocaleString('bn-BD')}`));const a=el('div','actions');action(a,'সম্পাদনা',async()=>routineForm(r));action(a,r.enabled?'বন্ধ করুন':'চালু করুন',async()=>{await request('routine',{...r,expectedVersion:r.version,enabled:!r.enabled});await refresh();if($('workCalendar').open)await loadCalendar(calendarMonth);});c.append(a);routines.append(c);}
   const reports=$('reportList');reports.replaceChildren();if(!state.reports.length)reports.append(el('section','panel','এখনো রিপোর্ট নেই। এজেন্টকে উৎসের নাম দিয়ে রিপোর্ট করতে বলুন।'));
   for(const r of state.reports){const c=el('article','panel');c.append(el('h2','',r.title),el('small','',`ID: ${r.id} · সংস্করণ ${r.version}`),el('p','report-content',r.body));const details=el('details');details.append(el('summary','','উৎস ও coverage দেখুন'),el('pre','evidence-box',JSON.stringify(r.evidence,null,2)));c.append(details);action(c,'লেখা সংশোধন',async()=>{editReport={id:r.id,version:r.version};$('reportEditTitle').textContent=r.title;$('reportBody').value=r.body;$('reportEditor').hidden=false;$('reportEditor').scrollIntoView({behavior:'smooth'});});reports.append(c);}
@@ -52,7 +78,6 @@ export function mountAgent({request,lock=()=>{}}){
   const conn=$('agentConnections');conn.replaceChildren();const items=[['Gmail',state.connections.gmail],['WhatsApp webhook',state.connections.whatsapp],['WhatsApp নির্দেশ ও উত্তর',state.connections.whatsAppChat],['Telegram নির্দেশ ও উত্তর',state.connections.telegramChat],['নিজের Facebook posts',state.connections.facebookPersonal],...state.connections.sites.map(s=>[`${s.key} website bridge`,s.bridge]),...state.connections.sites.map(s=>[`${s.key} repository`,s.repository]),...state.connections.instagram.map(s=>[`${s.key} Instagram`,s.configured])];for(const [name,on] of items){const row=el('div','connection');row.append(el('span','',name),el('span','muted',on?'সেটিং আছে; live যাচাই প্রয়োজন':'সংযোগ বাকি'));conn.append(row);}
   for(const s of state.connections.facebook||[]){const box=el('div','connection');box.append(el('span','',`${s.key} Facebook`));if(s.configured)action(box,'লাইভ যাচাই',async()=>{const d=await request('facebook_check',{site:s.key});notice(`${d.name}: Facebook সংযোগ কার্যকর।`);});else box.append(el('span','muted','সংযোগ বাকি'));conn.append(box);}
   for(const s of state.connections.sites){const box=el('div','connection');box.append(el('span','',s.key));action(box,'ওয়েবসাইট যাচাই',async()=>{const d=await request('website_check',{site:s.key});notice(`${d.domain}: সংযোগ সফল। ${d.reads.length}টি read action; ${Object.values(d.writes).filter(x=>x.enabled).length}টি write action চালু।`);});conn.append(box);}
-  $('agentConnection').textContent=creditRule;
  }
  async function refresh(){const e=epoch;const result=await request('state');if(e!==epoch)return;state=result;restoreAvatar();render();if(!timer)timer=setInterval(()=>{if(!document.hidden&&!$('app').hidden&&!$('agent').hidden&&!busy&&!polling&&state&&(state.jobs.some(isPending)||(state.today||[]).some(isPending)||state.routines.some(r=>r.enabled&&Date.parse(r.nextRunAt)<=Date.now())))pollJobs().catch(()=>{});},contract.product.agent.pollMs);}
  const readFile=file=>new Promise((resolve,reject)=>{const reader=new FileReader();reader.onload=()=>resolve(String(reader.result));reader.onerror=reject;reader.readAsDataURL(file);});
@@ -107,7 +132,7 @@ export function mountAgent({request,lock=()=>{}}){
   if(!pending||pending.command!==command||pending.media!==selected?.media)pending={requestId:crypto.randomUUID(),command,...(selected?{media:selected.media}:{})};
   const r=await request('command',pending);if(e!==epoch)return;
   pending=null;$('agentCommand').value='';clearAttachment();
-  notice(r.worker==='requested'?'বার্তা পাঠানো হয়েছে।':'কাজ কিউতে আছে। worker সেটআপ পরীক্ষা করুন।');await refresh();
+  if(r.worker==='requested')$('agentNotice').textContent='';else notice('বার্তা রাখা আছে। কাজ শুরু হতে একটু দেরি হচ্ছে।');await refresh();
  });
  $('brainForm').oninput=()=>{brainDirty=true;};
  $('brainForm').onsubmit=e=>{e.preventDefault();run($('brainSave'),async()=>{await request('brain',{expectedVersion:brainVersion,model:$('brainModel').value,instructions:$('brainInstructions').value,memory:$('brainMemory').value,timezone:$('brainZone').value,dailyAiCalls:Number($('brainDailyCalls').value),maxSteps:Number($('brainSteps').value),automaticSocial:$('brainSocial').checked,automaticWebsite:$('brainWebsite').checked,automaticDeploy:$('brainDeploy').checked,enabledTools:[...document.querySelectorAll('#brainTools input:checked')].map(e=>e.value)});brainDirty=false;await refresh();notice('ব্রেন সংরক্ষণ হয়েছে।');});};
