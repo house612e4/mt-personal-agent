@@ -6,12 +6,36 @@ import {bounded,publicMedia} from './agent-core.mjs';
 export const SITES={'mt-studio':{domain:'mt-studio-ai.com',prefix:'MT_STUDIO'},'golapi-shop':{domain:'golapishop.online',prefix:'GOLAPI_SHOP'}};
 export function createConnectors({store,env=process.env,http=remoteJSON}){
  const required=k=>{if(!env[k]?.trim())throw new AppError(503,`সংযোগ বাকি: ${k}`);return env[k].trim()};
+ const whatsAppOwner=env.WHATSAPP_OWNER_NUMBER?.trim().replace(/^\+/,'');
+ const telegramOwner=env.TELEGRAM_OWNER_CHAT_ID?.trim();
+ const whatsAppChat=Boolean(/^[1-9]\d{6,14}$/.test(whatsAppOwner||'')&&env.WHATSAPP_TOKEN&&env.WHATSAPP_PHONE_NUMBER_ID&&env.META_APP_SECRET&&env.WHATSAPP_VERIFY_TOKEN&&env.META_GRAPH_VERSION);
+ const telegramChat=Boolean(/^\d{1,16}$/.test(telegramOwner||'')&&env.TELEGRAM_BOT_TOKEN&&/^[A-Za-z0-9_-]{32,256}$/.test(env.TELEGRAM_WEBHOOK_SECRET?.trim()||''));
  const graphVersion=()=>{const v=required('META_GRAPH_VERSION');if(!/^v\d+\.\d+$/.test(v))throw new AppError(503,'Graph version সঠিক নয়।');return v;};
  const graph=async(path,token,body)=>http(`https://graph.facebook.com/${graphVersion()}/${path}`,{method:body?'POST':'GET',headers:{Authorization:`Bearer ${token}`,...(body?{'Content-Type':'application/json'}:{})},...(body?{body:JSON.stringify(body)}:{})},'Meta');
  const site=k=>{if(!SITES[k])throw new AppError(400,'ওয়েবসাইট সঠিক নয়।');return SITES[k];};
  const gh=async(k,path,body)=>{const s=site(k),repo=required(s.prefix+'_GITHUB_REPO');if(!/^[\w.-]+\/[\w.-]+$/.test(repo))throw new AppError(503,'Repository owner/name দিন।');return http(`https://api.github.com/repos/${repo}${path}`,{method:body?'POST':'GET',headers:{Authorization:`Bearer ${required('GITHUB_AGENT_TOKEN')}`,Accept:'application/vnd.github+json','Content-Type':'application/json'},...(body?{body:JSON.stringify(body)}:{})},'GitHub');};
  return{
- status:async()=>({gmail:!!(env.GOOGLE_CLIENT_ID&&env.GOOGLE_CLIENT_SECRET&&(env.GMAIL_REFRESH_TOKEN||(await store.col('config').doc('gmail').get()).exists)),whatsapp:!!(env.WHATSAPP_PHONE_NUMBER_ID&&env.META_APP_SECRET&&env.WHATSAPP_VERIFY_TOKEN),facebookPersonal:!!env.PERSONAL_FACEBOOK_USER_TOKEN,sites:Object.entries(SITES).map(([key,s])=>({key,bridge:!!(env[s.prefix+'_BRIDGE_URL']&&env[s.prefix+'_BRIDGE_KEY']),repository:!!(env[s.prefix+'_GITHUB_REPO']&&env.GITHUB_AGENT_TOKEN)})),instagram:Object.entries(SITES).map(([key,s])=>({key,configured:!!(env[s.prefix+'_INSTAGRAM_ID']&&env[s.prefix+'_PAGE_TOKEN'])}))}),
+  status:async()=>({whatsAppChat,telegramChat,gmail:!!(env.GOOGLE_CLIENT_ID&&env.GOOGLE_CLIENT_SECRET&&(env.GMAIL_REFRESH_TOKEN||(await store.col('config').doc('gmail').get()).exists)),whatsapp:!!(env.WHATSAPP_PHONE_NUMBER_ID&&env.META_APP_SECRET&&env.WHATSAPP_VERIFY_TOKEN),facebookPersonal:!!env.PERSONAL_FACEBOOK_USER_TOKEN,facebook:Object.entries(SITES).map(([key,s])=>({key,configured:!!(env[s.prefix+'_PAGE_ID']&&env[s.prefix+'_PAGE_TOKEN']&&env.META_GRAPH_VERSION)})),sites:Object.entries(SITES).map(([key,s])=>({key,bridge:!!(env[s.prefix+'_BRIDGE_URL']&&env[s.prefix+'_BRIDGE_KEY']),repository:!!(env[s.prefix+'_GITHUB_REPO']&&env.GITHUB_AGENT_TOKEN)})),instagram:Object.entries(SITES).map(([key,s])=>({key,configured:!!(env[s.prefix+'_INSTAGRAM_ID']&&env[s.prefix+'_PAGE_TOKEN'])}))}),
+  sendOwnerReply:async(source,recipient,text)=>{
+   if(source==='whatsapp'&&whatsAppChat&&recipient===whatsAppOwner){
+    const phoneId=required('WHATSAPP_PHONE_NUMBER_ID');
+    if(!/^\d+$/.test(phoneId))throw new AppError(503,'WhatsApp phone number ID সঠিক নয়।');
+    const result=await graph(`${phoneId}/messages`,required('WHATSAPP_TOKEN'),{
+     messaging_product:'whatsapp',recipient_type:'individual',to:recipient,type:'text',
+     text:{preview_url:false,body:text.slice(0,4000)}
+    });
+    return result.messages?.[0]?.id?'sent':'unconfirmed';
+   }
+   if(source==='telegram'&&telegramChat&&recipient===telegramOwner){
+    const result=await http(`https://api.telegram.org/bot${required('TELEGRAM_BOT_TOKEN')}/sendMessage`,{
+     method:'POST',headers:{'Content-Type':'application/json'},
+     body:JSON.stringify({chat_id:Number(recipient),text:text.slice(0,4000)})
+    },'Telegram');
+    return result.ok&&result.result?.message_id?'sent':'unconfirmed';
+   }
+   return 'skipped';
+  },
+  facebookPage:async k=>{const s=site(k),id=required(s.prefix+'_PAGE_ID'),token=required(s.prefix+'_PAGE_TOKEN');if(!/^\d+$/.test(id))throw new AppError(503,'Facebook Page ID সঠিক নয়।');const page=await graph(`${id}?fields=id,name,tasks`,token);if(page.id!==id)throw new AppError(409,'Page token ও Page ID মিলছে না।');return{id:page.id,name:page.name,tasks:Array.isArray(page.tasks)?page.tasks:[],live:true};},
  readSource:async name=>{
   if(name==='gmail'){
    const saved=await store.col('config').doc('gmail').get();const refresh=env.GMAIL_REFRESH_TOKEN||(saved.exists?unseal(saved.data().encryptedRefresh,env):null);if(!refresh)throw new AppError(503,'অ্যাপ থেকে Gmail যুক্ত করুন।');
@@ -42,7 +66,7 @@ export function createConnectors({store,env=process.env,http=remoteJSON}){
   const s=site(payload.accountKey),token=required(s.prefix+'_PAGE_TOKEN'),id=required(s.prefix+(payload.platform==='instagram'?'_INSTAGRAM_ID':'_PAGE_ID'));
   if(!/^\d+$/.test(id))throw new AppError(503,'Meta account ID সঠিক নয়।');
   if(env.DRY_RUN!=='false')throw new AppError(409,'DRY_RUN চালু; বাইরের পোস্ট প্রকাশ বন্ধ।');
-  const caption=bounded(payload.caption,2000),image=publicMedia(payload.imageUrl);
+  const image=publicMedia(payload.imageUrl),caption=image&&payload.caption===''?'':bounded(payload.caption,2000);
   if(payload.platform==='instagram'){
    if(!image)throw new AppError(400,'Instagram পোস্টের জন্য পাবলিক ছবির URL প্রয়োজন।');
    const container=await graph(`${id}/media`,token,{image_url:image,caption});
