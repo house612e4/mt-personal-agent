@@ -1,11 +1,13 @@
-# MT Personal Agent v3.1
+# MT Personal Agent v4.0
 
-মোবাইল থেকে বাংলায় কমান্ড, পরিবর্তনযোগ্য ব্রেন ও রুটিন, background jobs এবং উৎসসহ রিপোর্ট। Netlify Functions + Firebase owner login/Firestore; বাস্তব provider adapters রয়েছে, account integration চালু করতে নিজের configuration দরকার।
+মোবাইলের সহজ বাংলা chat থেকে কথা, ছবি, রুটিন, background কাজ এবং উৎসসহ রিপোর্ট। আরমানের চ্যাটে আজকের সংরক্ষিত কাজের হিসাব দেখায়। ছবি দিলে মূল ফাইল দিয়েই Facebook/Instagram পোস্ট কিউতে যায়। Netlify Functions + Firebase owner login/Firestore; বাস্তব provider adapters রয়েছে, account integration চালু করতে নিজের configuration দরকার।
 
+- অনুমোদিত মালিকের WhatsApp Business ও Telegram চ্যাট থেকে লিখিত নির্দেশ এবং একই চ্যাটে উত্তর।
+- রুটিনে মাসভিত্তিক অপেক্ষমাণ পোস্ট ও পরের রুটিন সময়।
 - ব্যবসার Facebook/Instagram লেখা/ছবি ও queue scheduling।
 - Gmail, সংগৃহীত WhatsApp Business events ও অনুমোদিত নিজের Facebook posts audit।
 - দুই ওয়েবসাইটের configured records এবং repository PR/CI merge/Netlify deployment যাচাই।
-- রিপোর্ট সংশোধন ও আগের version/evidence, per-tool trace, daily AI/image limits।
+- রিপোর্ট সংশোধন ও আগের version/evidence, per-tool trace, daily AI limits।
 - পুরোনো manual drafts/publication editor retained।
 
 **চালু করার ধাপ: [GUIDE-BN.md](GUIDE-BN.md)**। GitHub-এ ZIP-এর ভিতরের mt-personal-agent ফোল্ডারের contents repository root-এ দিন। package.json root-এ থাকতে হবে।

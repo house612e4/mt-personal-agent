@@ -1,6 +1,6 @@
 {
-  "name": "mt-personal-agent-mobile",
-  "version": "3.1.0",
+  "name": "mt-personal-agent",
+  "version": "4.1.0",
   "private": true,
   "type": "module",
   "engines": {

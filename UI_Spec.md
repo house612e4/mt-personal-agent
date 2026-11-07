@@ -8,10 +8,10 @@ v3.1: Brain-এর connection অংশে প্রত্যেক website-এ�
 ## পর্দা ও controls
 
 - Agent: সাম্প্রতিক ২০ job, Reports-এ সাম্প্রতিক ১০ report; পুরোনো report ID দিয়ে সংশোধন করা যায়, পূর্ণ report pagination নেই।
-- Agent: command textarea, send, image upload, কাজের status/result, trace, queued cancel ও eligible retry।
-- Routines: দিন, সময়, IANA timezone, command, enabled এবং বাইরের পরিবর্তনের অনুমতি; existing routine edit/pause।
+- আরমান: সবুজ header, মালিকের বাবল ও পাঠান বোতাম। নামের পাশে ঐচ্ছিক গোল avatar, ছবি বাছাই একই ব্রাউজারে থাকে। “আজকের কাজ” থেকে সম্পন্ন, বাকি ও যাচাইয়ের অবস্থা দেখা যায়। ছবি বাছাই করে পাঠালেই মূল ফাইল আপলোড হয়।
+- Routines: ঐচ্ছিক মাসভিত্তিক কাজের তালিকা একই পর্দায়। দিন, সময়, IANA timezone, command, enabled এবং বাইরের পরিবর্তনের অনুমতি; existing routine edit/pause।
 - Reports: শিরোনাম, ID/version, লেখা, expandable evidence/coverage, versioned editor।
-- Brain: text/image model, instructions, memory, timezone, steps, AI/image daily budgets, তিন autonomy flag ও tool allowlist।
+- Brain: text model, instructions, memory, timezone, steps, AI daily budget, তিন autonomy flag ও tool allowlist।
 - Settings: connection presence, Gmail OAuth, deployment setup। “সেটিং আছে” মানেই live token কার্যকর নয়।
 - আগের posting/drafts/account tools shortcut থেকে খোলা যায়।
 

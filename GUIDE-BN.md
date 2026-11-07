@@ -1,4 +1,4 @@
-# মোবাইলে MT Personal Agent v3.1 চালু করা
+# মোবাইলে MT Personal Agent v4.0 চালু করা
 
 কোডে এজেন্টের command queue, routine, brain, report ও provider adapters আছে। নিজের server/account/site সংযোগ এখনো বসানো হয়নি। নিচের setup একবার করতে হবে; এরপর মোবাইলের ব্রাউজার থেকেই কমান্ড ও দৈনিক রুটিন বদলাতে পারবেন। Secret এখানে বা chat-এ পাঠাবেন না।
 
@@ -21,7 +21,7 @@ Netlify environment variables-এ Functions scope-সহ .env.example-এর প
 | INTERNAL_WORKER_SECRET | নিজের অন্তত ৩২ অক্ষরের random secret |
 | CREDENTIAL_ENCRYPTION_KEY | ৩২ random bytes-এর base64; Gmail token encryption |
 | AGENT_BASE_URL | deployed agent-এর HTTPS origin; Netlify URL env থাকলে সেটি ব্যবহৃত হয় |
-| FIREBASE_STORAGE_BUCKET | নিজের Firebase Storage bucket নাম; image upload/generation-এর জন্য |
+| FIREBASE_STORAGE_BUCKET | নিজের Firebase Storage bucket নাম; মূল ছবি আপলোডের জন্য |
 | DRY_RUN | প্রথমে true; বাস্তব social প্রকাশে false |
 
 Codespaces terminal-এ worker secret-এর জন্য `openssl rand -hex 32`, encryption key-এর জন্য `openssl rand -base64 32` চালাতে পারেন। ভিন্ন values দিন, server settings-এ সংরক্ষণ করুন। Encryption key হারালে/বদলালে Gmail আবার connect করতে হবে। নিজের .env বা service-account JSON GitHub-এ commit নয়। Storage provider-এর billing/quota চালু করুন; images-এর token URL যার কাছে থাকবে সে ছবিটি দেখতে পারবে। ব্যক্তিগত ছবি এভাবে প্রকাশ করবেন কি না নিজে সিদ্ধান্ত নিন।
@@ -48,11 +48,20 @@ Agent env-এ WHATSAPP_PHONE_NUMBER_ID, WHATSAPP_VERIFY_TOKEN এবং META_APP
 
 একই verify token এবং প্রয়োজনীয় message/coexistence subscriptions বসান। Secret signature ও exact phone ID না মিললে data গ্রহণ হয় না। নতুন incoming events এবং provider দিলে echo/history events সংগ্রহ হয়। History events backfill হিসেবে চিহ্নিত। ফোনের পুরোনো সব chats বা media contents নিজে থেকে আসে না; বাস্তব inbound/echo coverage পরীক্ষা করে নিন।
 
+মালিকের WhatsApp থেকে আরমানকে লিখে নির্দেশ দিতে Functions scope-এ `WHATSAPP_OWNER_NUMBER` (দেশের কোডসহ নিজের প্রেরক নম্বর), `WHATSAPP_TOKEN` ও `META_GRAPH_VERSION` দিন। ওই নম্বর থেকে সংযুক্ত WhatsApp Business নম্বরে টেক্সট পাঠান। ফল একই চ্যাটে যাবে। অন্য নম্বরের বার্তা শুধু অনুমোদিত audit-এর তথ্য হিসেবে থাকবে। উত্তর পাঠানোর ফল নিশ্চিত না হলে আরমানের ওয়েব চ্যাটে কাজের ফল দেখা যাবে।
+
+### Telegram-এ আরমান
+
+1. BotFather দিয়ে নিজের bot তৈরি করুন। Functions scope-এ `TELEGRAM_BOT_TOKEN` ও নিজের ব্যক্তিগত সংখ্যাসূচক `TELEGRAM_OWNER_CHAT_ID` দিন।
+2. `openssl rand -hex 32` দিয়ে নতুন `TELEGRAM_WEBHOOK_SECRET` তৈরি করুন। Functions scope-এ সেভ করে redeploy করুন।
+3. [Telegram setWebhook](https://core.telegram.org/bots/api#setwebhook)-এ নিজের bot-এর জন্য `url` হিসেবে `https://YOUR-AGENT-DOMAIN/.netlify/functions/telegram-webhook`, `secret_token` হিসেবে একই secret, এবং `allowed_updates` হিসেবে `["message"]` দিন।
+4. Telegram-এ bot-এর ব্যক্তিগত চ্যাট খুলে একটি সাধারণ টেক্সট লিখুন। যেমন “বসের জন্য একটি শুভেচ্ছা লিখো।” ফল একই ব্যক্তিগত চ্যাটে যাবে। একই বার্তার পুনঃডেলিভারিতে দ্বিতীয় কাজ তৈরি হয় না।
+
 ## ৪. ব্যবসার Facebook ও Instagram
 
 Meta app-এর supported META_GRAPH_VERSION দিন। MT_STUDIO_PAGE_ID/TOKEN ও GOLAPI_SHOP_PAGE_ID/TOKEN নিজের Page data দিয়ে মিলিয়ে দিন; template-এর পুরোনো IDs অন্ধভাবে বিশ্বাস নয়। Publishing/reading-এর প্রযোজ্য permissions ও app access নিজে configure করুন।
 
-Professional Instagram account ও Page connection অনুযায়ী MT_STUDIO_INSTAGRAM_ID এবং GOLAPI_SHOP_INSTAGRAM_ID দিন। এখানে Page-token-ভিত্তিক Facebook Login Graph integration আছে। Instagram feed ছবির জন্য public HTTPS JPEG/PNG URL লাগবে; app upload বা generate_image tool URL দিতে পারে। Video/reels নেই।
+Professional Instagram account ও Page connection অনুযায়ী MT_STUDIO_INSTAGRAM_ID এবং GOLAPI_SHOP_INSTAGRAM_ID দিন। এখানে Page-token-ভিত্তিক Facebook Login Graph integration আছে। চ্যাটে PNG/JPEG ছবি বাছাই করে নির্দেশসহ পাঠান। পোস্টে একই মূল ফাইল ব্যবহার হয়। ছবি AI-তে পাঠানো, বদলানো বা তৈরি করার ধাপ নেই। Video/reels নেই।
 
 নিজের Facebook posts audit-এর জন্য PERSONAL_FACEBOOK_USER_TOKEN ও অনুমোদিত own-post reading access প্রয়োজন। এটি Messenger/personal inbox audit নয়।
 
@@ -120,7 +129,7 @@ Brain-এ website/deploy permission, GitHub branch protection ও existing Netli
 
 ## ৬. মোবাইল থেকে নিয়মিত ব্যবহার
 
-Owner login → Brain-এ নিজের instructions, memory, text/image models, timezone ও daily budgets ঠিক করুন। Default timezone নিজের সঙ্গে মিলিয়ে বদলান। Default daily budget ১০০ Responses call ও ৫ image; এক command-এ কয়েকটি call লাগতে পারে। Provider billing আলাদা। Model নাম লিখলেই account access পাওয়া যায় না।
+Owner login → Brain-এ নিজের instructions, memory, text model, timezone ও daily AI সীমা ঠিক করুন। Default timezone নিজের সঙ্গে মিলিয়ে বদলান। Default দৈনিক সীমা ১০০ Responses call। পোস্ট কিউ, রুটিন সংরক্ষণ ও রিপোর্টের ফল থেকে সরাসরি উত্তর আসে। প্রয়োজনীয় বহু-ধাপের নির্দেশে একাধিক call লাগতে পারে। Provider billing আলাদা। Model নাম লিখলেই account access পাওয়া যায় না।
 
 কমান্ডের উদাহরণ:
 
@@ -129,7 +138,7 @@ Owner login → Brain-এ নিজের instructions, memory, text/image model
 - “Golapi Shop-এর capabilities দেখে products পড়ো, তারপর এই পণ্যের description বদলাও।”
 - “এই report ID-এর লেখায় আমার নির্দেশ অনুযায়ী সংশোধন করো; মূল evidence রেখো।”
 
-Routines-এ title/command/time/timezone/days দিন। দৈনিক audit-এর routine শুধু read দিয়েই চলতে পারে। বাইরের post/website changes চাইলে routine allowWrites এবং Brain-এর সংশ্লিষ্ট permission দুটোই চালু থাকতে হবে। রুটিন pause/edit করলে পুরোনো version-এর queued কাজ cancel হয়; running action ফিরিয়ে নেওয়া যায় না।
+Routines-এ title/command/time/timezone/days দিন। “কাজের ক্যালেন্ডার” খুললে নির্বাচিত মাসের অপেক্ষমাণ পোস্ট ও সক্রিয় রুটিনের পরের সময় দেখা যাবে। দৈনিক audit-এর routine শুধু read দিয়েই চলতে পারে। বাইরের post/website changes চাইলে routine allowWrites এবং Brain-এর সংশ্লিষ্ট permission দুটোই চালু থাকতে হবে। রুটিন pause/edit করলে পুরোনো version-এর queued কাজ cancel হয়; running action ফিরিয়ে নেওয়া যায় না।
 
 Reports-এ লেখার সঙ্গে evidence/coverage দেখুন, সম্পাদনা করুন। Agent jobs-এ ধাপ দেখুন। “ফল যাচাই প্রয়োজন” হলে বাইরের site/page-এ বাস্তব ফল দেখুন; একই কাজ তাড়াতাড়ি আবার পাঠাবেন না। Manual draft publication-এর uncertain outcome-এ অন্তত দুই মিনিট পরে owner reconciliation করুন।
 
@@ -137,4 +146,4 @@ Android Chrome menu বা iPhone Safari Share থেকে Add to Home Screen �
 
 ## যাচাই ও অবশিষ্ট কাজ
 
-Agent build-এ ৮৭টি local test পাস করেছে। MT Studio source-এ ১৭টি নির্বাচিত test, Golapi bridge-এ ৩টি প্রযোজ্য test পাস (৩টি MT-only case skipped)। Full target dependency installation/build এখানে করা যায়নি—offline package cache অসম্পূর্ণ। Local automated checks mocked services/DOM দিয়ে হয়েছে; live accounts, target repositories, deployed Node 22, phone-closed routine এবং actual Android/iPhone layout পরীক্ষা বাকি। সংযোগের পাশে “সেটিং আছে” credential validity-এর প্রমাণ নয়। Plan.md-এ live activation checklist আছে। এই কোডকে credentials বসানো ও site-specific adaptation ছাড়া সম্পূর্ণ চালু ব্যক্তিগত agent বলা যাবে না।
+`npm run build` চালালে বর্তমান প্যাকেজের স্বয়ংক্রিয় পরীক্ষার ফল দেখা যাবে। Local automated checks mocked services/DOM দিয়ে হয়েছে; live accounts, target repositories, deployed Node 22, phone-closed routine এবং actual Android/iPhone layout পরীক্ষা deploy-এর পরে বাকি। Settings-এ Facebook-এর “লাইভ যাচাই” button token ও Page ID দিয়ে সত্যিকারের Graph request করে। এই কোডকে credentials, provider permissions ও live validation ছাড়া সম্পূর্ণ চালু ব্যক্তিগত agent বলা যাবে না।

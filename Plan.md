@@ -1,6 +1,6 @@
-# MT Personal Agent — Implementation plan v3.1
+# MT Personal Agent — Implementation plan v4.0
 
-v3.1 ধাপ: দুই uploaded source-এর backend/rules/admin flow পড়া → site profiles → bridge invariants/tests → agent discovery/probe → source-aware installer/overlays → local tests → deploy ও secret configuration বাকি। Target site production audit/full mobile build সম্পন্ন দাবি নয়।
+v4.0 ধাপ: chat-first UI → অপরিবর্তিত ছবি সংযুক্তি → সংরক্ষিত আজকের কাজ → এক কমান্ডে একটি social queue handoff → live Facebook probe → mobile layout → automated validation। Target site production audit/full mobile device test সম্পন্ন দাবি নয়।
 
 
 ## বাস্তবায়িত ও local যাচাই
@@ -10,14 +10,15 @@ v3.1 ধাপ: দুই uploaded source-এর backend/rules/admin flow পড়
 - [x] Daily/weekly routines, timezone, deterministic occurrence, pause/version invalidation, scheduled pulse/background worker।
 - [x] Evidence-linked reports, versioned correction, explicit disconnected/partial coverage।
 - [x] Gmail OAuth/encrypted refresh, signed WhatsApp event ingestion, authorized personal-post reader।
-- [x] Business social text/photo queue, image generation/upload, Facebook/Instagram API adapters।
+- [x] Business social text/photo queue, অপরিবর্তিত image upload, Facebook/Instagram API adapters।
 - [x] Website bridge adapter, explicit resource/field maps, replay/idempotency protection।
 - [x] Repository read/single-file PR, required CI merge gate, optional exact-commit Netlify monitoring।
+- [ ] WhatsApp Business ও Telegram-এ মালিকের লিখিত নির্দেশ এবং একই চ্যাটে ফল live পরীক্ষা।
 - [x] Mobile navigation and forms, logout cleanup, build-time executable blueprint contract।
 
 Build validates six contracts, JS syntax (including website adapter), JSON, HTML IDs/element references/PWA assets and runs node:test. Tests cover mocked backend/DOM behavior; these are not real-provider or device tests. Final test count is the build output, not a permanent promise in this file.
 
-Local handoff evidence: agent build ৮৭ passed; MT Studio bridge+selected security/payment ১৭ passed; Golapi bridge ৩ passed, ৩ MT-only skipped। Target production build/dependency install pending; offline npm cache missing dependency, live services not exercised।
+Local validation-এর ফল build output-এ পাওয়া যাবে। Target provider live calls, production deployment এবং actual Android/iPhone device test এখনো deploy-এর পরে করতে হবে।
 
 ## চালু করার বাকি কাজ
 

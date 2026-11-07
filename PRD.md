@@ -1,13 +1,16 @@
-# MT Personal Agent — PRD v3.1
+# MT Personal Agent — PRD v4.0
 
-নতুন কাজ (v3.1): আপলোড করা দুই সোর্সের actual collection/schema অনুযায়ী site-specific signed bridge; capability discovery, paginated reads, revision-bound updates, atomic order cancellation/financial ledger এবং website connection probe। Generic arbitrary collection/patch access বাদ। External bank payout/refund নয়।
+নতুন কাজ (v4.0): মূল অভিজ্ঞতা chat-first। Owner স্বাভাবিক বাংলায় কথা, ছবি ও কাজ দেয়; conversation timeline-এ নির্দেশ, অগ্রগতি ও ফল থাকে। আরমান প্রতিটি উত্তরে মালিককে “বস” বলে ডাকবে। “আজকের কাজ” সংরক্ষিত ফল ও অপেক্ষমাণ কাজ দেখায়। প্রতিটি কমান্ডে খরচ বাঁচানোর স্থায়ী নিয়ম প্রযোজ্য। আগের site-specific signed bridge, revision-bound update ও financial safeguards বহাল।
 
 
 এক মালিকের মোবাইল-উপযোগী ব্যক্তিগত এজেন্ট। বাংলায় নির্দেশ, পরিবর্তনযোগ্য ব্রেন/স্মৃতি/টুল, দৈনিক বা সাপ্তাহিক রুটিন, উৎসসহ রিপোর্ট ও সংশোধন এর মূল কাজ। ফোন বন্ধ থাকলেও চালু server deployment-এর worker কাজ করবে।
 
 ## কাজের পরিধি
 
-- MT Studio ও Golapi Shop-এর Facebook/Instagram লেখা, ছবি তৈরি/আপলোড এবং এজেন্টের queue-তে সিডিউল; Meta-তে native schedule তৈরির দাবি নয়। সর্বোচ্চ প্রায় পাঁচ মিনিটের scheduler ব্যবধান, queue ও provider latency যোগ হবে।
+- আরমানের একই নির্দেশের কিউতে মালিকের WhatsApp Business ও ব্যক্তিগত Telegram bot থেকে লিখিত নির্দেশ আসবে। অনুমোদিত মালিকের ঠিকানায় কাজের উত্তর যাবে।
+- রুটিন পর্দায় ঐচ্ছিক মাসের ক্যালেন্ডার থেকে কিউতে থাকা পোস্ট ও প্রতিটি সক্রিয় রুটিনের পরের সময় দেখা যাবে।
+
+- MT Studio ও Golapi Shop-এর Facebook/Instagram লেখা, অপরিবর্তিত ছবি আপলোড এবং এজেন্টের queue-তে সিডিউল; Meta-তে native schedule তৈরির দাবি নয়। সর্বোচ্চ প্রায় পাঁচ মিনিটের scheduler ব্যবধান, queue ও provider latency যোগ হবে।
 - Gmail, WhatsApp Business থেকে সংগৃহীত events, নিজের API-অনুমোদিত Facebook পোস্ট ও দুই ওয়েবসাইটের configured records থেকে রিপোর্ট। কোনো উৎস অনুপলব্ধ হলে তা রিপোর্টে থাকবে।
 - mt-studio-ai.com এবং golapishop.online-এর source-specific capability অনুযায়ী records পড়া ও typed action। Source repository-তে ফাইল পড়া, একটি বিদ্যমান ফাইলের পরিবর্তনের PR, configured CI পাস করলে ঐচ্ছিক merge এবং Netlify deployment যাচাই।
 - User নিজে ব্রেনের model, instructions, memory, timezone, tool allowlist, খরচের daily limits ও autonomy flags বদলাবেন। রুটিনের সময়/দিন/কমান্ড/চালু-বন্ধ বদলানো যাবে।
@@ -46,7 +49,7 @@ Gmail audit সর্বশেষ এক দিনের সর্বোচ্�
       "label": "Golapi Shop Online",
       "kind": "page",
       "initial": "GS",
-      "url": "https://www.facebook.com/profile.php?id=410455022157073",
+      "url": "https://www.facebook.com/profile.php?id=61596314931955",
       "prefix": "GOLAPI_SHOP"
     },
     {
@@ -68,14 +71,14 @@ Gmail audit সর্বশেষ এক দিনের সর্বোচ্�
       "revise_report",
       "remember",
       "manage_routine",
-      "generate_image",
       "merge_code_change",
       "deployment_status",
       "list_code"
     ],
+    "name": "আরমান",
+    "creditRule": "শুধু দেওয়া কাজটুকু করো। বাড়তি ধাপ, AI কল, ছবি তৈরি বা সম্পাদনা এবং অতিরিক্ত পোস্ট বাদ দাও। সংযুক্ত ছবি যেমন আছে তেমনই ব্যবহার করো।",
     "maxSteps": 8,
     "maxDailyAiCalls": 1000,
-    "maxDailyImages": 50,
     "pollMs": 7000,
     "workerBatchSize": 5,
     "routineScanLimit": 100
