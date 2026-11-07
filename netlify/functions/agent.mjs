@@ -3,7 +3,7 @@ import {randomUUID} from 'node:crypto';
 import {signState,googleRedirect} from '../../server/agent-credentials.mjs';
 import {services} from './api.mjs';
 import {createAgentService} from '../../server/agent-service.mjs';
-import {bounded} from '../../server/agent-core.mjs';
+import {bounded,publicMedia} from '../../server/agent-core.mjs';
 import {AppError} from '../../server/core.mjs';
 import {wake} from '../../server/agent-runtime.mjs';
 const reply=(statusCode,data)=>({statusCode,headers:{'Content-Type':'application/json; charset=utf-8','Cache-Control':'no-store'},body:JSON.stringify(data)});
@@ -26,13 +26,16 @@ export const handler=async event=>{
    const url=new URL('https://accounts.google.com/o/oauth2/v2/auth');url.search=new URLSearchParams({client_id:env.GOOGLE_CLIENT_ID,redirect_uri:googleRedirect(env),response_type:'code',scope:'https://www.googleapis.com/auth/gmail.readonly',access_type:'offline',prompt:'consent',state}).toString();return reply(200,{url:url.href});
   }
   if(action==='website_check'){if(!['mt-studio','golapi-shop'].includes(b.site))throw new AppError(400,'ওয়েবসাইট বাছুন।');return reply(200,await service.connectors.website(b.site,'capabilities'));}
-  if(action==='jobs')return reply(200,{jobs:await store.list('jobs','createdAt',20)});
+  if(action==='facebook_check'){if(!['mt-studio','golapi-shop'].includes(b.site))throw new AppError(400,'Facebook পেজ বাছুন।');return reply(200,await service.connectors.facebookPage(b.site));}
+  if(action==='calendar')return reply(200,await service.calendar(b.month));
+  if(action==='jobs')return reply(200,await service.jobs());
   if(action==='state')return reply(200,await service.state());
   if(action==='brain')return reply(200,await store.saveBrain(b));
   if(action==='routine'){if(b.id)id(b.id);return reply(200,await store.saveRoutine(b));}
   if(action==='report')return reply(200,await store.editReport({...b,id:id(b.id)}));
   if(action==='command'){
-   const result=await store.enqueue({id:id(b.requestId),payload:{command:bounded(b.command,6000)},allowWrites:true});let worker='requested';try{await wake();}catch{worker='setup_or_dispatch_pending';}return reply(202,{...result,worker});
+   let media=null;if(b.media!==undefined){if(!b.media||typeof b.media!=='object'||Array.isArray(b.media)||!['image/png','image/jpeg'].includes(b.media.contentType))throw new AppError(400,'সংযুক্ত ছবির তথ্য সঠিক নয়।');media={url:publicMedia(b.media.url),contentType:b.media.contentType};}
+   const result=await store.enqueue({id:id(b.requestId),payload:{command:bounded(b.command,6000),media},allowWrites:true});let worker='requested';try{await wake();}catch{worker='setup_or_dispatch_pending';}return reply(202,{...result,worker});
   }
   if(action==='run'){let worker='requested';try{await wake();}catch(e){throw new AppError(503,e.message);}return reply(202,{worker});}
   if(action==='trace')return reply(200,{trace:await store.col('jobs').doc(id(b.id)).collection('trace').orderBy('createdAt','asc').limit(40).get().then(s=>s.docs.map(d=>d.data()))});
