@@ -56,7 +56,7 @@ async function api(action, body = {}) {
 function tab(name, refresh = true) {
   document.querySelectorAll('.tab').forEach(e => { e.hidden = e.id !== name; });
   document.querySelectorAll('[data-tab]').forEach(e => e.classList.toggle('active', e.dataset.tab === name));
-  $('pageTitle').textContent = { agent:'আপনার এজেন্ট',routines:'কাজের রুটিন',reports:'দৈনিক রিপোর্ট',brain:'এজেন্টের ব্রেন',compose: 'নতুন পোস্ট', drafts: 'আমার খসড়া', insights: 'পেজের তথ্য', settings: 'সংযোগ ও সেটআপ' }[name];
+  $('pageTitle').textContent = { agent:contract.product.agent.name,routines:'কাজের রুটিন',reports:'দৈনিক রিপোর্ট',brain:'এজেন্টের ব্রেন',compose: 'নতুন পোস্ট', drafts: 'আমার খসড়া', insights: 'পেজের তথ্য', settings: 'সংযোগ ও সেটআপ' }[name];
   if (['agent','routines','reports','brain'].includes(name) && refresh) agentUI.refresh().catch(e=>toast(errorText(e)));
   if (name === 'drafts' && refresh) loadDrafts().catch(e => toast(errorText(e)));
   window.scrollTo({ top: 0, behavior: 'smooth' });

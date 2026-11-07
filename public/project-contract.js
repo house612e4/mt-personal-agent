@@ -18,7 +18,7 @@ export default {
         "label": "Golapi Shop Online",
         "kind": "page",
         "initial": "GS",
-        "url": "https://www.facebook.com/profile.php?id=410455022157073",
+        "url": "https://www.facebook.com/profile.php?id=61596314931955",
         "prefix": "GOLAPI_SHOP"
       },
       {
@@ -40,14 +40,14 @@ export default {
         "revise_report",
         "remember",
         "manage_routine",
-        "generate_image",
         "merge_code_change",
         "deployment_status",
         "list_code"
       ],
+      "name": "আরমান",
+      "creditRule": "শুধু দেওয়া কাজটুকু করো। বাড়তি ধাপ, AI কল, ছবি তৈরি বা সম্পাদনা এবং অতিরিক্ত পোস্ট বাদ দাও। সংযুক্ত ছবি যেমন আছে তেমনই ব্যবহার করো।",
       "maxSteps": 8,
       "maxDailyAiCalls": 1000,
-      "maxDailyImages": 50,
       "pollMs": 7000,
       "workerBatchSize": 5,
       "routineScanLimit": 100
