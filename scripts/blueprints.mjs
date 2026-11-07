@@ -26,7 +26,8 @@ export function verifyBlueprints(root,c){
  for(const [k,v] of Object.entries(c.schema.paths))requireRule(/^[A-Za-z][A-Za-z0-9_-]*$/.test(v),'invalid collection path '+k);
  for(const v of Object.values(c.ui.colors))requireRule(/^#[0-9a-f]{6}$/i.test(v),'UI color must be a six-digit hex value');
  requireRule(c.product.agent&&Array.isArray(c.product.agent.tools)&&new Set(c.product.agent.tools).size===c.product.agent.tools.length,'agent tool allowlist is required');
- for(const n of [c.product.agent.maxSteps,c.product.agent.maxDailyAiCalls,c.product.agent.maxDailyImages,c.product.agent.pollMs,c.product.agent.workerBatchSize,c.product.agent.routineScanLimit])requireRule(positive(n),'agent policy values must be positive integers');
+ requireRule(c.product.agent.name && c.product.agent.creditRule,'agent name and credit rule are required');
+ for(const n of [c.product.agent.maxSteps,c.product.agent.maxDailyAiCalls,c.product.agent.pollMs,c.product.agent.workerBatchSize,c.product.agent.routineScanLimit])requireRule(positive(n),'agent policy values must be positive integers');
  requireRule(c.product.agent.maxSteps<=12&&c.product.agent.workerBatchSize<=10,'agent execution bounds exceed supported range');
  const pkg=JSON.parse(readFileSync(resolve(root,'package.json'),'utf8'));
  const lock=JSON.parse(readFileSync(resolve(root,'package-lock.json'),'utf8'));
