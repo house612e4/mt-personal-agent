@@ -1,3 +1,4 @@
+import {readChatStream} from './chat-stream.js';
 import {mountAgent} from './agent-ui.js';
 import contract from './project-contract.js';
 const $ = id => document.getElementById(id);
@@ -28,6 +29,7 @@ function errorText(e) {
 function controls() {
   document.querySelectorAll('button, input, textarea, select').forEach(e => {
     if (e.closest('dialog')) return;
+    if(['sidebarToggle','drawerShade'].includes(e.id))return;
     e.disabled = busy || (e.id === 'loginButton' || e.id === 'reset') && !authReady || e.dataset.unavailable === 'true';
   });
 }
@@ -57,6 +59,7 @@ function tab(name, refresh = true) {
   document.querySelectorAll('.tab').forEach(e => { e.hidden = e.id !== name; });
   document.querySelectorAll('[data-tab]').forEach(e => e.classList.toggle('active', e.dataset.tab === name));
   $('app').classList.toggle('chat-open',name==='agent');
+  $('app').classList.toggle('drawer-open',false);$('drawerShade').hidden=true;
   $('pageTitle').textContent = { agent:contract.product.agent.name,routines:'কাজের রুটিন',reports:'দৈনিক রিপোর্ট',brain:'এজেন্টের ব্রেন',compose: 'নতুন পোস্ট', drafts: 'আমার খসড়া', insights: 'পেজের তথ্য', settings: 'সংযোগ ও সেটআপ' }[name];
   if (['agent','routines','reports','brain'].includes(name) && refresh) agentUI.refresh().catch(e=>toast(errorText(e)));
   if (name === 'drafts' && refresh) loadDrafts().catch(e => toast(errorText(e)));
@@ -273,6 +276,16 @@ async function agentRequest(action,body={}) {
  const response=await fetch('/.netlify/functions/agent?action='+action,{method:'POST',headers:{Authorization:`Bearer ${token}`,'Content-Type':'application/json'},body:JSON.stringify(body),signal:AbortSignal.timeout(30000)});
  const data=await response.json();if(active!==user)throw Error('সেশন বদলেছে।');if(!response.ok)throw Error(data.error||'কাজ হয়নি।');return data;
 }
-const agentUI=mountAgent({request:agentRequest,lock:value=>{busy=value;controls();}});
+async function agentChat(body,onEvent){
+ if(demo)throw Error('চ্যাট ব্যবহার করতে নিজের অ্যাকাউন্টে লগইন করো।');
+ const active=user;if(!active)throw Error('আগে লগইন করো।');
+ const token=await active.getIdToken();
+ const response=await fetch('/.netlify/functions/chat',{
+  method:'POST',headers:{Authorization:`Bearer ${token}`,'Content-Type':'application/json'},
+  body:JSON.stringify(body),signal:AbortSignal.timeout(55000)
+ });
+ return readChatStream(response,event=>{if(active===user)onEvent(event);});
+}
+const agentUI=mountAgent({request:agentRequest,send:agentChat,lock:value=>{busy=value;controls();}});
 boot();
 if ('serviceWorker' in navigator) navigator.serviceWorker.register('/sw.js').catch(() => {});
