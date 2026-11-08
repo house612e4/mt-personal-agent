@@ -9,7 +9,8 @@ function fixture(request,send=null){
  class Reader{readAsDataURL(file){this.result=file.data;this.onload();}}
  const localStorage={getItem:key=>values.get(key),setItem:(key,value)=>values.set(key,value)};
  const browserURL={createObjectURL:()=> 'blob:photo',revokeObjectURL:value=>revoked.push(value)};
- const context=vm.createContext({document,contract,FileReader:Reader,localStorage,URL:browserURL,Intl,Date,JSON,Set,Number,String,Object,Promise,crypto:{randomUUID:()=> 'request-stable-123'},setInterval:()=>1,clearInterval:()=>{},window:{confirm:()=>false,location:{assign(){}}}});vm.runInContext(source,context);return{ui:context.mount({request,send}),nodes,revoked};
+	 const uploaded=[];const fetch=async(url,options)=>{uploaded.push([url,options]);return{ok:true}};
+	 const context=vm.createContext({document,contract,FileReader:Reader,localStorage,URL:browserURL,Intl,Date,JSON,Set,Number,String,Object,Promise,fetch,AbortSignal,crypto:{randomUUID:()=> 'request-stable-123'},setInterval:()=>1,clearInterval:()=>{},window:{confirm:()=>false,location:{assign(){}}}});vm.runInContext(source,context);return{ui:context.mount({request,send}),nodes,revoked,uploaded};
 }
 const initial=()=>({brain:{...DEFAULT_BRAIN},jobs:[],reports:[],routines:[],connections:{sites:[{key:'mt-studio',bridge:true,repository:false}],instagram:[],gmail:false,whatsapp:false,facebookPersonal:false}});
 const descendants=e=>[e,...e.children.flatMap(descendants)];
@@ -28,17 +29,17 @@ test('opening Arman shows saved progress and Boss replies with a read-only reque
  assert.ok(descendants(f.nodes.get('agentJobs')).some(e=>e.textContent==='বস, রিপোর্ট তৈরি হয়েছে।'));
 });
 
-test('selecting a post image is local and sending uses the original bytes in one upload',async()=>{
+test('selecting a post image is local and sending uses one signed raw upload',async()=>{
  const calls=[],url='https://example.com/original.png',data='data:image/png;base64,iVBORw0KGgo=';
- const f=fixture(async(action,body)=>{calls.push([action,body]);if(action==='upload')return{url,contentType:'image/png'};if(action==='command')return{worker:'requested'};return initial();});
+	 const f=fixture(async(action,body)=>{calls.push([action,body]);if(action==='upload_prepare')return{uploadId:'upload-123456',uploadUrl:'https://storage.googleapis.com/signed',mediaType:'image'};if(action==='upload_finalize')return{url,contentType:'image/png',mediaType:'image',storagePath:'agent-media/owner/original.png'};if(action==='command')return{worker:'requested'};return initial();});
  await f.ui.refresh();
  f.nodes.get('agentImage').files=[{name:'original.png',type:'image/png',size:8,data}];
  f.nodes.get('agentImage').onchange();
  assert.deepEqual(calls.map(c=>c[0]),['state']);
  f.nodes.get('agentCommand').value='এই ছবিটি ফেসবুকে পোস্ট করো';
  await f.nodes.get('agentSend').onclick();
- assert.deepEqual(calls.map(c=>c[0]),['state','upload','command','state']);
- assert.equal(calls[1][1].base64,data.split(',')[1]);assert.equal(calls[2][1].media.url,url);
+	 assert.deepEqual(calls.map(c=>c[0]),['state','upload_prepare','upload_finalize','command','state']);
+	 assert.equal(calls[1][1].size,8);assert.equal(f.uploaded.length,1);assert.equal(f.uploaded[0][1].body.name,'original.png');assert.equal(calls[3][1].media.url,url);
  assert.deepEqual(f.revoked,['blob:photo']);
 });
 test('avatar is kept in the browser and does not call the server',async()=>{

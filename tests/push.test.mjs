@@ -35,6 +35,15 @@ test('expired subscriptions are removed and cannot cause the completed work to r
  assert.equal((await store.get('jobs',id)).status,'succeeded');
 });
 
+test('failed push is retried by the scheduled maintenance path',async()=>{
+ const f=siteDb(),store=createStore(f.db,'owner');let attempts=0;
+ const push=createPushService({store,env,send:async()=>{attempts++;if(attempts===1)throw Error('temporary');}});
+ await push.subscribe(subscription);const {id}=await store.enqueue({payload:{command:'রিপোর্ট করো'}});await store.finish(id,'succeeded','শেষ।',true);
+ assert.equal((await push.notify({id,kind:'command'},'succeeded')).status,'failed');
+ assert.equal((await push.retryPending()).retried,1);
+ const job=await store.get('jobs',id);assert.equal(job.pushStatus,'sent');assert.equal(job.pushAttempts,2);assert.equal(attempts,2);
+});
+
 test('push refuses arbitrary network endpoints and malformed browser keys',()=>{
  assert.throws(()=>pushSubscription({...subscription,endpoint:'https://localhost/private'}));
  assert.throws(()=>pushSubscription({...subscription,keys:{auth:'bad',p256dh:'bad'}}));

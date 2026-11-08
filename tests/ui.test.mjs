@@ -1,16 +1,23 @@
-import contract from '../public/project-contract.js';
-import test from 'node:test';import assert from 'node:assert/strict';import vm from 'node:vm';import {readFileSync} from 'node:fs';
-class Element {
- constructor(){this.style={};this.value='';this.hidden=false;this.children=[];this.dataset={};this.classList={toggle(){}};this.textContent='';this.disabled=false;}
- append(...x){this.children.push(...x)} replaceChildren(...x){this.children=x} setAttribute(){} closest(){return null} close(){} addEventListener(){}
-}
-function setup(){const nodes=new Map();const get=id=>{if(!nodes.has(id))nodes.set(id,new Element());return nodes.get(id)};const dialogs=[];
-const context=vm.createContext({mountAgent:()=>({reset(){},refresh:async()=>{}}),contract,document:{getElementById:get,createElement:()=>new Element(),querySelectorAll:()=>[...nodes.values()].filter(n=>n.id),querySelector:()=>null},window:{scrollTo(){},addEventListener(){},confirm:()=>true},navigator:{},localStorage:{getItem:()=>null,setItem(){}},setTimeout:()=>1,clearTimeout(){},AbortSignal,crypto:globalThis.crypto,console});
-vm.runInContext(readFileSync(new URL('../public/app.js',import.meta.url),'utf8').replace(/^import .*\n/gm, '').split('\nboot();')[0],context);return{context,get,run:s=>vm.runInContext(s,context)};}
-test('selected account click preserves draft edit identity',()=>{const f=setup();f.run("editing='existing-draft';editingVersion=5;accountUI()");f.get('accounts').children[0].onclick();assert.equal(f.run('editing'),'existing-draft');assert.equal(f.run('editingVersion'),5);});
-test('account cannot switch during AI generation',async()=>{const f=setup();let resolve;f.context.pending=new Promise(r=>resolve=r);f.run("api=async()=>await pending;$('topic').value='MT Studio';accountUI()");const task=f.run("$('generate').onclick()");f.get('accounts').children[1].onclick();assert.equal(f.run('selected'),'mt-studio');resolve({text:'MT Studio লেখা'});await task;assert.equal(f.get('post').value,'MT Studio লেখা');assert.equal(f.run('busy'),false);});
-test('changing account clears old content with discard confirmation',()=>{const f=setup();f.run("$('post').value='পুরোনো লেখা';editing='draft-existing';dirty=true;accountUI()");f.get('accounts').children[1].onclick();assert.equal(f.run('selected'),'golapi-shop');assert.equal(f.get('post').value,'');assert.equal(f.run('editing'),null);});
-test('cancelled account switch preserves content',()=>{const f=setup();f.context.window.confirm=()=>false;f.run("$('post').value='পুরোনো লেখা';dirty=true;accountUI()");f.get('accounts').children[1].onclick();assert.equal(f.run('selected'),'mt-studio');assert.equal(f.get('post').value,'পুরোনো লেখা');});
-test('save sends the version and stable draft ID',async()=>{const f=setup();f.context.requests=[];f.run("api=async(action,body)=>{requests.push({action,body});return action==='save'?{id:body.id,version:8}:{drafts:[],cursor:null}};editing='existing-draft';editingVersion=7;$('post').value='সংশোধন'");await f.run("$('save').onclick()");assert.equal(f.context.requests[0].body.expectedVersion,7);assert.equal(f.context.requests[0].body.id,'existing-draft');assert.equal(f.run('editingVersion'),8);assert.equal(f.run('dirty'),false);});
-test('logout clears personal data rendered in page',()=>{const f=setup();f.run("user={};$('draftList').append('private');$('insightResult').append('private');$('post').value='private';clearSession()");assert.equal(f.get('draftList').children.length,0);assert.equal(f.get('insightResult').children.length,0);assert.equal(f.get('post').value,'');assert.equal(f.run('user'),null);});
-test('demo storage failure does not claim a successful save',async()=>{const f=setup();f.context.localStorage.setItem=()=>{throw Error('quota')};f.run("demo=true;$('post').value='পরীক্ষা'");await f.run("$('save').onclick()");assert.equal(f.run('drafts.length'),0);assert.match(f.get('toast').textContent,/রাখা যায়নি/);});
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import {readFileSync} from 'node:fs';
+
+const html=readFileSync(new URL('../public/index.html',import.meta.url),'utf8');
+const app=readFileSync(new URL('../public/app.js',import.meta.url),'utf8');
+
+test('production UI is chat-first and legacy demo dashboard is absent',()=>{
+ assert.match(html,/id="agent"/);
+ assert.match(html,/id="agentCommand"/);
+ assert.doesNotMatch(html,/id="demo"|id="compose"|id="drafts"|id="insights"|id="post"/);
+});
+
+test('main navigation contains only agent operations',()=>{
+ for(const tab of ['agent','routines','reports','brain','settings'])assert.match(html,new RegExp(`data-tab="${tab}"`));
+ assert.doesNotMatch(html,/data-tab="compose"|data-tab="drafts"|data-tab="insights"/);
+});
+
+test('logout clears the mounted agent state and authenticated session',()=>{
+ assert.match(app,/agentUI\.reset\(\)/);
+ assert.match(app,/user=null/);
+ assert.match(app,/fb\.signOut\(auth\)/);
+});
