@@ -1,4 +1,6 @@
-# আরমান v4.1.1
+# আরমান v5.0.0
+
+পূর্ণপর্দা চ্যাট, কথোপকথনভিত্তিক স্থায়ী স্মৃতি, reasoning model, দীর্ঘ tool execution, Gmail/WhatsApp/Telegram action, অপরিবর্তিত ছবি/ভিডিও পোস্ট এবং server-side Web Push রয়েছে।
 
 মোবাইলের সহজ বাংলা chat থেকে কথা, ছবি, রুটিন, background কাজ এবং উৎসসহ রিপোর্ট। আরমানের চ্যাটে আজকের সংরক্ষিত কাজের হিসাব দেখায়। ছবি দিলে মূল ফাইল দিয়েই Facebook/Instagram পোস্ট কিউতে যায়। Netlify Functions + Firebase owner login/Firestore; বাস্তব provider adapters রয়েছে, account integration চালু করতে নিজের configuration দরকার।
 

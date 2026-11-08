@@ -1,4 +1,4 @@
-# মোবাইলে MT Personal Agent v4.0 চালু করা
+# মোবাইলে MT Personal Agent v5.0 চালু করা
 
 কোডে এজেন্টের command queue, routine, brain, report ও provider adapters আছে। নিজের server/account/site সংযোগ এখনো বসানো হয়নি। নিচের setup একবার করতে হবে; এরপর মোবাইলের ব্রাউজার থেকেই কমান্ড ও দৈনিক রুটিন বদলাতে পারবেন। Secret এখানে বা chat-এ পাঠাবেন না।
 
@@ -36,7 +36,7 @@ Google Cloud project-এ Gmail API enable করুন। OAuth consent এব�
 
 সেটি deployed hostname-এর সঙ্গে একদম মিলতে হবে। Consent app testing mode হলে নিজের Gmail test user হিসেবে দিন; testing-token expiry/production verification ও refresh-token restrictions নিজের Google project-এ যাচাই করুন। Redeploy-এর পরে owner login → ব্রেন → Gmail যুক্ত করুন → নিজের Gmail-এ readonly consent। Token encrypted অবস্থায় server database-এ থাকবে। GMAIL_REFRESH_TOKEN optional fallback; সাধারণ ব্যবহারে ফাঁকা রাখুন।
 
-এখন Gmail audit সর্বশেষ এক দিনের সর্বোচ্চ ৫০ message-এর subject/from/date/snippet ও labels পড়ে। Full body/attachments পড়ে না, email পাঠায় না। “সব মেইল সম্পূর্ণ পড়েছে” দাবি করবে না।
+এখন Gmail audit সর্বশেষ এক দিনের সর্বোচ্চ ৫০ message-এর subject/from/date/snippet ও labels পড়ে। Agent tool দিয়ে search, একটি message-এর plain-text body পড়া, email পাঠানো, read করা ও archive করা যায়। Attachment পড়ে না। আগে readonly consent দিয়ে থাকলে নতুন `gmail.modify` permission-এর জন্য অ্যাপ থেকে আবার Gmail যুক্ত করুন। ব্যক্তিগত ব্যবহারে Google OAuth test user হিসেবে নিজের account রাখুন; public app হলে Google-এর verification নিয়ম প্রযোজ্য হতে পারে।
 
 ## ৩. WhatsApp Business অ্যাপ
 
@@ -148,3 +148,29 @@ Android Chrome menu বা iPhone Safari Share থেকে Add to Home Screen �
 পেজে translate="no" এবং notranslate নির্দেশ দেওয়া আছে। Browser নিজস্ব অনুবাদের বার দেখালে × চেপে বন্ধ করুন। ব্রাউজারের “এই ভাষা অনুবাদ করবে না” পছন্দ থাকলে বাংলা বাছতে পারেন।
 
 Powered by Netlify ব্যাজ hosting থেকে যুক্ত হয়। নিজের Netlify project → Project configuration → General → Powered by Netlify badge বন্ধ করে Save করুন। পরেরবার পেজ খুললেই নতুন সেটিং কার্যকর হবে। [Netlify-এর নিয়ম](https://docs.netlify.com/manage/projects/powered-by-netlify-badge/)
+
+
+## এই সংস্করণের নতুন সেটআপ
+
+### Server-side push
+
+1. Terminal-এ `npx web-push@4.0.0 generate-vapid-keys --json` দিয়ে একবার key pair তৈরি করুন।
+2. Netlify Functions scope-এ `VAPID_PUBLIC_KEY` ও `VAPID_PRIVATE_KEY` দিন। `VAPID_SUBJECT`-এ নিজের `mailto:you@example.com` অথবা HTTPS site URL দিন। Private key server-এ রাখুন।
+3. Redeploy করুন। অ্যাপের মেনু → সেটআপ → নোটিফিকেশন চালু করো চাপুন ও অনুমতি দিন। সঙ্গে সঙ্গে পরীক্ষামূলক push পাঠানো হবে। সেটি এলে server-to-device পথটি কার্যকর।
+
+### যোগাযোগ ও শক্তিশালী ব্রেন
+
+Brain-এ “ইমেইল ও বার্তা পাঠাতে পারবে” চালু না থাকলে Gmail/WhatsApp/Telegram write হবে না। বর্তমান নির্দেশে প্রাপক ও কী পাঠাতে হবে স্পষ্ট থাকতে হবে। WhatsApp-এর সাধারণ text provider-এর conversation-window নিয়ম মানে; window-এর বাইরে আগে থেকে অনুমোদিত template ব্যবহার করুন। Telegram bot শুধু যে chat-এ প্রবেশাধিকার পেয়েছে সেখানে পাঠাতে পারে।
+
+Default model `gpt-6-astra`, reasoning `medium`, সর্বোচ্চ ১০ ধাপ; চাইলে ১২ পর্যন্ত করা যায়। Provider account-এ model access না থাকলে Brain থেকে নিজের account-এ থাকা model দিন। আলাদা memory records থেকে বর্তমান command-এর সঙ্গে মেলা সর্বশেষ স্মৃতি context-এ আসে। বেশি reasoning ও ধাপের খরচ বেশি হতে পারে।
+4. iPhone-এ iOS 16.4 বা নতুন সংস্করণে Safari/ব্রাউজারের Share → Add to Home Screen দিয়ে অ্যাপ খুলে অনুমতি দিন। Server worker কাজ শেষ হলে push service-এ encrypted notification পাঠাবে। অ্যাপ খোলা রাখা লাগে না। ডিভাইসের Focus/notification settings ও নেটওয়ার্ক delivery-তে প্রভাব ফেলতে পারে।
+
+### ছবি, ভিডিও ও ক্যাপশন
+
+প্লাস বোতামে সর্বোচ্চ ২ MB-এর PNG/JPEG অথবা ৪ MB-এর MP4/MOV বেছে নির্দেশ দিন। মূল bytes অপরিবর্তিতভাবে Storage-এ সেভ হয়। বড় ভিডিওর public HTTPS link চ্যাটে দিয়ে ভিডিও হিসেবে প্রকাশের নির্দেশ দিতে পারেন। Media পোস্টে ক্যাপশন খালি, অনুপস্থিত বা null হলে empty string হয়; Firestore-এ undefined field যায় না। Instagram ভিডিও container প্রস্তুত না হওয়া পর্যন্ত worker poll করে। Facebook ভিডিও একবার প্রকাশের অনুরোধ পাঠিয়ে processing শেষ হয়েছে কি না যাচাই করে। Platform-এর media format, দৈর্ঘ্য ও account permission লাগবে।
+
+### চ্যাটের ব্যবহার
+
+মেনুতে নতুন চ্যাট ও সাম্প্রতিক কথোপকথন পাওয়া যাবে। প্রতিটি চ্যাটের context আলাদা। সাম্প্রতিক ১০০টি job থেকে কথোপকথনের তালিকা এবং নির্বাচিত কথোপকথনের সর্বশেষ ৪০টি job দেখা যায়। চ্যাট খোলা, বদলানো বা নতুন চ্যাট শুরুতে AI কল লাগে না।
+
+Golapi Facebook URL `https://www.facebook.com/profile.php?id=410455022157073`। নিজের token ওই Page ID-এর সঙ্গে মেলাবেন।

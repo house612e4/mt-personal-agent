@@ -1,5 +1,9 @@
 # MT Personal Agent — Schema v3.1
 
+config/push/subscriptions/{endpoint-hash}-এ subscription। jobs/{id}-এ pushStatus ও providerState। Video processing state claim-এর মধ্যে সংরক্ষণ করে পরের worker pass-এ poll হয়। ক্যাপশন অনুপস্থিত থাকলে মিডিয়া পোস্টে empty string। undefined field লেখা হয় না।
+
+jobs-এ liveText ও cancelReason optional। web chat payload.live=true হলে worker provider-এর text stream সর্বোচ্চ প্রায় এক সেকেন্ডে একবার সংরক্ষণ করে। finish-এ liveText মুছে canonical result সেভ হয়। successful legacy chat taskActivity অনির্ধারিত হলে আজকের সম্পন্ন কাজ বলে গণনা হয় না।
+
 নতুন command job-এ taskActivity boolean থাকবে। সাধারণ সফল কথোপকথন আজকের কাজের তালিকায় গণনা হবে না। পুরোনো job-এর taskActivity না থাকলে আগের ফল রাখা হয়।
 
 v3.1 site schema: MT Studio settings/brand, settings/policies, users, records, files, manualPayments, contests, competitions; Golapi orders, products, users, staff, setting, support_tickets এবং যাচাইকৃত ERP collections। _agent_operations, _agent_audit, _agent_nonces target database-এ। Raw update/delete নয়; data hash revision ও transaction।
@@ -12,6 +16,7 @@ Firestore document model; relational foreign key নেই। প্রত্য
 | config/brain | model, instructions, memory, timezone, tools, flags, budgets, version; expectedVersion save |
 | config/brain/history/{version} | manual brain-save-এর পুরোনো config; remember memory append-এ history snapshot হয় না |
 | config/gmail | AES-GCM encrypted refresh token; key server env-এ |
+| memories/{id} | আলাদা স্থায়ী স্মৃতি; text, createdAt, updatedAt; সর্বশেষ ১০০টির মধ্যে command-এর সঙ্গে মিলিয়ে প্রাসঙ্গিক ১২টি model context-এ যায় |
 | oauth/{nonce} | expiry, used; callback state replay বন্ধ |
 | routines/{UUID} | title, command, HH:mm, timezone, days, enabled, allowWrites, version, nextRunAt |
 | jobs/{UUID/hash} | kind, payload, status, runAt, routineId/version, allowWrites, created/started/finishedAt, result, polls |
@@ -44,7 +49,8 @@ firestore.indexes.json-এ jobs status/runAt এবং status/startedAt indexes�
     "reports": "reports",
     "config": "config",
     "events": "events",
-    "oauth": "oauth"
+    "oauth": "oauth",
+    "memories": "memories"
   },
   "pageSize": 50,
   "maxBodyLength": 16000,

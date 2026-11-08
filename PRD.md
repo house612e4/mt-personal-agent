@@ -1,4 +1,10 @@
-# MT Personal Agent — PRD v4.0
+# MT Personal Agent — PRD v5.0
+
+নতুন সংশোধন। ChatGPT-ধাঁচের পূর্ণপর্দা চ্যাট ও পাশের মেনু। ক্যাপশন ছাড়াও মূল ছবি/ভিডিও পোস্ট হবে। Server-side Web Push-এ কাজের সমাপ্তি জানানো যাবে। Golapi Page URL মালিকের নিশ্চিত করা 410455022157073।
+
+v5.0-এ reasoning model ও দীর্ঘ tool loop, আলাদা durable memory records এবং যোগাযোগের action যোগ হয়েছে। Gmail-এ search/read/send/mark-read/archive, WhatsApp Cloud API-তে text/template এবং Telegram bot-এ message পাঠানো যাবে। প্রাপক ও content বর্তমান মালিকের নির্দেশে স্পষ্ট না থাকলে কোনো message পাঠানো যাবে না। Gmail/WhatsApp/Telegram-এর provider সীমা ও permission অতিক্রম করার দাবি করা যাবে না।
+
+সাধারণ চ্যাটে server-এর আসল লেখা ধাপে ধাপে আসবে। এই পথও একই দৈনিক AI quota মানবে। পেজ অডিটের জন্য সংযুক্ত Facebook Page-এর নাম ও সাম্প্রতিক পোস্ট পড়ার source থাকবে।
 
 চ্যাটে সাধারণ কথার সরাসরি স্বাভাবিক উত্তর, প্রতি উত্তরে একবার বস সম্বোধন। সফল কথোপকথনে আলাদা কাজের ফলের লেবেল থাকবে না।
 
@@ -20,7 +26,7 @@
 
 ## সীমা ও গ্রহণযোগ্যতা
 
-“সব” ওয়েবসাইট কাজ ব্যবহারকারীর লক্ষ্য; bridge-এর explicit mappings ও GitHub/Netlify integration ছাড়া বাস্তব সম্পূর্ণ প্রশাসনিক প্রবেশাধিকার পাওয়া যায় না। বর্তমান কোডে এক PR-তে একটি বিদ্যমান ফাইল পরিবর্তন হয়; নতুন ফাইল, বহুফাইল refactor, refund/payment gateway action, arbitrary terminal execution, video/reels, ব্যক্তিগত email/chat পাঠানো নেই। Actual payment collection/refund শুধু database status বদলানোর সমান নয়।
+“সব” ওয়েবসাইট কাজ ব্যবহারকারীর লক্ষ্য; bridge-এর explicit mappings ও GitHub/Netlify integration ছাড়া বাস্তব সম্পূর্ণ প্রশাসনিক প্রবেশাধিকার পাওয়া যায় না। বর্তমান কোডে এক PR-তে একটি বিদ্যমান ফাইল পরিবর্তন হয়; নতুন ফাইল, বহুফাইল refactor, refund/payment gateway action, arbitrary terminal execution, ব্যক্তিগত email/chat পাঠানো নেই। Actual payment collection/refund শুধু database status বদলানোর সমান নয়।
 
 Gmail audit সর্বশেষ এক দিনের সর্বোচ্চ ৫০ message-এর headers/snippets; পুরো body/attachment নয়। WhatsApp audit সংযুক্ত platform/coexistence webhook events; Business অ্যাপ install থাকলেই ফোনের chat পড়া যায় না। ব্যক্তিগত Facebook audit অনুমোদিত নিজের পোস্টের সর্বোচ্চ ২৫টি; inbox/Messenger নয়। Website overview নির্বাচিত resource-এর প্রথম ২ record; paginated reads ১–১০ record প্রতি page; পূর্ণ code/security audit নয়। Coverage ও truncation দৃশ্যমান থাকবে।
 
@@ -51,7 +57,7 @@ Gmail audit সর্বশেষ এক দিনের সর্বোচ্�
       "label": "Golapi Shop Online",
       "kind": "page",
       "initial": "GS",
-      "url": "https://www.facebook.com/profile.php?id=61596314931955",
+      "url": "https://www.facebook.com/profile.php?id=410455022157073",
       "prefix": "GOLAPI_SHOP"
     },
     {
@@ -75,11 +81,12 @@ Gmail audit সর্বশেষ এক দিনের সর্বোচ্�
       "manage_routine",
       "merge_code_change",
       "deployment_status",
-      "list_code"
+      "list_code",
+      "communication_action"
     ],
     "name": "আরমান",
     "creditRule": "শুধু দেওয়া কাজটুকু করো। বাড়তি ধাপ, AI কল, ছবি তৈরি বা সম্পাদনা এবং অতিরিক্ত পোস্ট বাদ দাও। সংযুক্ত ছবি যেমন আছে তেমনই ব্যবহার করো।",
-    "maxSteps": 8,
+    "maxSteps": 12,
     "maxDailyAiCalls": 1000,
     "pollMs": 7000,
     "workerBatchSize": 5,
