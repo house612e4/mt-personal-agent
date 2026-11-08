@@ -8,7 +8,7 @@ const terminal=new Set(['succeeded','attention','blocked','failed','uncertain','
 const json=(status,data)=>Response.json(data,{status,headers:{'Cache-Control':'no-store'}});
 
 // The browser observes one durable job. Disconnecting this response never cancels the worker.
-export function createChatHandler({env=process.env,getServices=services,makeService=createAgentService,wakeWorker=wake,waitMs=45000}={}){
+export function createChatHandler({env=process.env,getServices=services,makeService=createAgentService,wakeWorker=wake,waitMs=115000}={}){
  return async request=>{
   try{
    if(request.method!=='POST')throw new AppError(405,'POST প্রয়োজন।');
@@ -31,7 +31,8 @@ export function createChatHandler({env=process.env,getServices=services,makeServ
     if(!input.media||!['image/png','image/jpeg','video/mp4','video/quicktime'].includes(input.media.contentType))throw new AppError(400,'PNG বা JPEG ছবি দাও।');
     const url=publicMedia(input.media.url);
     if(!url)throw new AppError(400,'ছবিটি সঠিকভাবে সংযুক্ত হয়নি। আবার বেছে নাও।');
-    media={url,contentType:input.media.contentType,mediaType:/^video\//.test(input.media.contentType)?'video':'image'};
+    const storagePath=input.media.storagePath;if(storagePath!==undefined&&(typeof storagePath!=='string'||!storagePath.startsWith(`agent-media/${user.uid}/`)||storagePath.includes('..')))throw new AppError(400,'সংযুক্ত মিডিয়ার path সঠিক নয়।');
+    media={url,contentType:input.media.contentType,mediaType:/^video\//.test(input.media.contentType)?'video':'image',...(storagePath?{storagePath}:{})};
    }
    const {store}=makeService({db,uid:user.uid,env});
    const {created}=await store.enqueue({id,payload:{command,media,live:true,conversationId},allowWrites:true});

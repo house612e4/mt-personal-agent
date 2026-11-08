@@ -1,5 +1,5 @@
 import {createPushService} from '../../server/push-service.mjs';
-import {saveImage,saveVideo,mediaType} from '../../server/agent-media.mjs';
+import {saveImage,saveVideo,mediaType,prepareMediaUpload,finalizeMediaUpload} from '../../server/agent-media.mjs';
 import {randomUUID} from 'node:crypto';
 import {signState,googleRedirect} from '../../server/agent-credentials.mjs';
 import {services} from './api.mjs';
@@ -19,6 +19,18 @@ export const handler=async event=>{
   if((event.body||'').length>(event.queryStringParameters?.action==='upload'?6000000:45000))throw new AppError(413,'অনুরোধ খুব বড়।');
   let b;try{b=JSON.parse(event.body||'{}');}catch{throw new AppError(400,'Input সঠিক নয়।');}if(!b||typeof b!=='object'||Array.isArray(b))throw new AppError(400,'Input সঠিক নয়।');
   const service=createAgentService({db,uid:user.uid}),action=event.queryStringParameters?.action,store=service.store;
+  if(action==='upload_prepare'){
+   const contentType=String(b.contentType||''),size=Number(b.size),prepared=await prepareMediaUpload({uid:user.uid,contentType,size});
+   const uploadId=randomUUID();await store.col('uploads').doc(uploadId).set({storagePath:prepared.storagePath,contentType,size,status:'pending',expiresAt:Date.now()+10*60_000,createdAt:new Date().toISOString()});
+   return reply(200,{uploadId,uploadUrl:prepared.uploadUrl,maxBytes:prepared.maxBytes,mediaType:prepared.mediaType});
+  }
+  if(action==='upload_finalize'){
+   const uploadId=id(b.uploadId),ref=store.col('uploads').doc(uploadId),snap=await ref.get();if(!snap.exists)throw new AppError(404,'আপলোডের তথ্য পাওয়া যায়নি।');const pending=snap.data();
+   if(pending.status==='ready'&&pending.result)return reply(200,pending.result);
+   if(pending.status!=='pending'||pending.expiresAt<Date.now())throw new AppError(409,'আপলোডের সময় শেষ হয়েছে। আবার ফাইল বেছে নাও।');
+   await db.runTransaction(async tx=>{const current=await tx.get(ref);if(current.data()?.status!=='pending')throw new AppError(409,'আপলোডটি ইতিমধ্যে যাচাই হচ্ছে।');tx.update(ref,{status:'finalizing'});});
+   try{const result=await finalizeMediaUpload(pending,user.uid);await ref.set({status:'ready',result,finishedAt:new Date().toISOString()},{merge:true});return reply(200,result);}catch(error){await ref.set({status:'failed',error:error.status?error.message:'আপলোড যাচাই হয়নি।'},{merge:true}).catch(()=>{});throw error;}
+  }
   if(action==='upload'){
    if(typeof b.base64!=='string'||!/^[A-Za-z0-9+/]+={0,2}$/.test(b.base64))throw new AppError(400,'মিডিয়ার তথ্য সঠিক নয়।');
    const bytes=Buffer.from(b.base64,'base64'),type=mediaType(bytes);
@@ -39,6 +51,7 @@ export const handler=async event=>{
   if(action==='push_subscribe')return reply(200,await createPushService({store}).subscribe(b.subscription));
   if(action==='push_test')return reply(200,await createPushService({store}).test());
   if(action==='push_unsubscribe')return reply(200,await createPushService({store}).unsubscribe(b.endpoint));
+	  if(action==='live_verify')return reply(200,await service.verify());
   if(action==='calendar')return reply(200,await service.calendar(b.month));
   if(action==='jobs')return reply(200,await service.jobs(undefined,b.conversationId));
   if(action==='state')return reply(200,await service.state(b.conversationId));
@@ -46,7 +59,7 @@ export const handler=async event=>{
   if(action==='routine'){if(b.id)id(b.id);return reply(200,await store.saveRoutine(b));}
   if(action==='report')return reply(200,await store.editReport({...b,id:id(b.id)}));
   if(action==='command'){
-   let media=null;if(b.media!==undefined){if(!b.media||typeof b.media!=='object'||Array.isArray(b.media)||!['image/png','image/jpeg','video/mp4','video/quicktime'].includes(b.media.contentType))throw new AppError(400,'সংযুক্ত ছবির তথ্য সঠিক নয়।');media={url:publicMedia(b.media.url),contentType:b.media.contentType,mediaType:/^video\//.test(b.media.contentType)?'video':'image'};}
+   let media=null;if(b.media!==undefined){if(!b.media||typeof b.media!=='object'||Array.isArray(b.media)||!['image/png','image/jpeg','video/mp4','video/quicktime'].includes(b.media.contentType))throw new AppError(400,'সংযুক্ত মিডিয়ার তথ্য সঠিক নয়।');const storagePath=b.media.storagePath;if(storagePath!==undefined&&(typeof storagePath!=='string'||!storagePath.startsWith(`agent-media/${user.uid}/`)||storagePath.includes('..')))throw new AppError(400,'সংযুক্ত মিডিয়ার path সঠিক নয়।');media={url:publicMedia(b.media.url),contentType:b.media.contentType,mediaType:/^video\//.test(b.media.contentType)?'video':'image',...(storagePath?{storagePath}:{})};}
    const result=await store.enqueue({id:id(b.requestId),payload:{command:bounded(b.command,6000),media,conversationId:conversationInput(b.conversationId)},allowWrites:true});let worker='requested';try{await wake();}catch{worker='setup_or_dispatch_pending';}return reply(202,{...result,worker});
   }
   if(action==='run'){let worker='requested';try{await wake();}catch(e){throw new AppError(503,e.message);}return reply(202,{worker});}
