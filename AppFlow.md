@@ -1,5 +1,9 @@
 # MT Personal Agent — App flow v3.1
 
+মিডিয়া নির্বাচন → মূল bytes বা যাচাইকৃত public link → একই job → provider processing state সংরক্ষণ → processing poll → publish ফল। Push নিবন্ধন শুধু মালিকের button press-এ। কাজ শেষ হলে server নিবন্ধিত endpoint-এ notification পাঠায়।
+
+ওয়েব চ্যাট → stable request ID-তে durable job → worker → প্রকৃত partial text সংরক্ষণ → owner-only SSE পর্যবেক্ষণ → চ্যাটে লেখা ও চূড়ান্ত ফল। স্ট্রিম বিচ্ছিন্ন হলে একই job-এর ফল পড়া হয়। দ্বিতীয় AI job তৈরি হয় না। বাতিল অবস্থাকে metadata হিসেবে কারণসহ দেখানো হয়।
+
 সাম্প্রতিক বার্তা user/assistant ভূমিকা অক্ষত রেখে AI-তে যাবে। আগের মূল ছবি পুনর্ব্যবহারে uploaded:<job-id> রেফারেন্স server যাচাই করবে।
 
 v3.1 website flow: live capabilities → resource.list/get → exact revision + typed action → transaction-এ operation/audit/result commit। Conflict হলে reread; একই operation ID-তে অন্য input নয়। Target write/financial flags-ও যাচাই হবে।
