@@ -1,7 +1,7 @@
 import test from 'node:test';import assert from 'node:assert/strict';import vm from 'node:vm';import {readFileSync} from 'node:fs';
 import contract from '../public/project-contract.js';import {DEFAULT_BRAIN} from '../server/agent-core.mjs';
-function fixture(request){
- class Element{constructor(tag='div'){this.tagName=tag;this.children=[];this.textContent='';this.value='';this.checked=false;this.hidden=false;this.disabled=false;}append(...v){this.children.push(...v)}replaceChildren(...v){this.children=[...v]}scrollIntoView(){} }
+function fixture(request,send=null){
+ class Element{constructor(tag='div'){this.tagName=tag;this.children=[];this.textContent='';this.value='';this.checked=false;this.hidden=false;this.disabled=false;this.style={};}append(...v){this.children.push(...v)}replaceChildren(...v){this.children=[...v]}scrollIntoView(){} }
  const nodes=new Map([...readFileSync(new URL('../public/index.html',import.meta.url),'utf8').matchAll(/id="([^"]+)"/g)].map(m=>[m[1],new Element()]));
  const document={hidden:false,addEventListener(){},getElementById:id=>nodes.get(id),createElement:tag=>new Element(tag),querySelectorAll:()=>[]};
  let source=readFileSync(new URL('../public/agent-ui.js',import.meta.url),'utf8').replace(/^import .*\n/,'').replace('export function mountAgent','function mountAgent');source+='\nthis.mount=mountAgent;';
@@ -9,7 +9,7 @@ function fixture(request){
  class Reader{readAsDataURL(file){this.result=file.data;this.onload();}}
  const localStorage={getItem:key=>values.get(key),setItem:(key,value)=>values.set(key,value)};
  const browserURL={createObjectURL:()=> 'blob:photo',revokeObjectURL:value=>revoked.push(value)};
- const context=vm.createContext({document,contract,FileReader:Reader,localStorage,URL:browserURL,Intl,Date,JSON,Set,Number,String,Object,Promise,crypto:{randomUUID:()=> 'request-stable-123'},setInterval:()=>1,clearInterval:()=>{},window:{location:{assign(){}}}});vm.runInContext(source,context);return{ui:context.mount({request}),nodes,revoked};
+ const context=vm.createContext({document,contract,FileReader:Reader,localStorage,URL:browserURL,Intl,Date,JSON,Set,Number,String,Object,Promise,crypto:{randomUUID:()=> 'request-stable-123'},setInterval:()=>1,clearInterval:()=>{},window:{confirm:()=>false,location:{assign(){}}}});vm.runInContext(source,context);return{ui:context.mount({request,send}),nodes,revoked};
 }
 const initial=()=>({brain:{...DEFAULT_BRAIN},jobs:[],reports:[],routines:[],connections:{sites:[{key:'mt-studio',bridge:true,repository:false}],instagram:[],gmail:false,whatsapp:false,facebookPersonal:false}});
 const descendants=e=>[e,...e.children.flatMap(descendants)];
