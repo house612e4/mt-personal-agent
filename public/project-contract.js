@@ -18,7 +18,7 @@ export default {
         "label": "Golapi Shop Online",
         "kind": "page",
         "initial": "GS",
-        "url": "https://www.facebook.com/profile.php?id=61596314931955",
+        "url": "https://www.facebook.com/profile.php?id=410455022157073",
         "prefix": "GOLAPI_SHOP"
       },
       {
@@ -42,11 +42,12 @@ export default {
         "manage_routine",
         "merge_code_change",
         "deployment_status",
-        "list_code"
+        "list_code",
+        "communication_action"
       ],
       "name": "আরমান",
       "creditRule": "শুধু দেওয়া কাজটুকু করো। বাড়তি ধাপ, AI কল, ছবি তৈরি বা সম্পাদনা এবং অতিরিক্ত পোস্ট বাদ দাও। সংযুক্ত ছবি যেমন আছে তেমনই ব্যবহার করো।",
-      "maxSteps": 8,
+      "maxSteps": 12,
       "maxDailyAiCalls": 1000,
       "pollMs": 7000,
       "workerBatchSize": 5,
@@ -79,6 +80,7 @@ export default {
   },
   "tech": {
     "firebaseAdmin": "14.5.0",
+    "webPush": "4.0.0",
     "firebaseWebSdk": "11.10.0",
     "globOverride": "14.0.3",
     "nodeMajor": 22,
@@ -96,7 +98,8 @@ export default {
       "reports": "reports",
       "config": "config",
       "events": "events",
-      "oauth": "oauth"
+      "oauth": "oauth",
+      "memories": "memories"
     },
     "pageSize": 50,
     "maxBodyLength": 16000,
