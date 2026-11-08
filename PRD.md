@@ -78,6 +78,7 @@ Gmail audit সর্বশেষ এক দিনের সর্বোচ্�
       "list_reports",
       "revise_report",
       "remember",
+      "manage_memory",
       "manage_routine",
       "merge_code_change",
       "deployment_status",

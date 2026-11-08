@@ -1,4 +1,4 @@
-# মোবাইলে MT Personal Agent v5.0 চালু করা
+# মোবাইলে MT Personal Agent v6.0 চালু করা
 
 কোডে এজেন্টের command queue, routine, brain, report ও provider adapters আছে। নিজের server/account/site সংযোগ এখনো বসানো হয়নি। নিচের setup একবার করতে হবে; এরপর মোবাইলের ব্রাউজার থেকেই কমান্ড ও দৈনিক রুটিন বদলাতে পারবেন। Secret এখানে বা chat-এ পাঠাবেন না।
 
@@ -92,7 +92,7 @@ Agent env:
 | GOLAPI_SHOP_BRIDGE_URL | https://golapishop.online/.netlify/functions/agent-bridge |
 | MT_STUDIO_BRIDGE_KEY, GOLAPI_SHOP_BRIDGE_KEY | সংশ্লিষ্ট site-এর key; দুই site-তে ভিন্ন key |
 
-সব deploy-এর পরে agent → Brain → “ওয়েবসাইট যাচাই” চাপুন। এটি সত্যিকারের signed request করে site/protocol/চালু actions পরীক্ষা করে। শুধু settings presence দেখে successful connection বলে না।
+সব deploy-এর পরে Setup → “সব সংযোগ যাচাই করুন” চাপুন। এটি OpenAI ও configured Gmail/Meta/Telegram/website bridge-এ নিরাপদ live read request চালায়। শুধু settings presence দেখে successful connection বলে না।
 
 ### কোন কাজের সংযোগ আছে
 
@@ -167,7 +167,7 @@ Default model `gpt-6-astra`, reasoning `medium`, সর্বোচ্চ ১০
 
 ### ছবি, ভিডিও ও ক্যাপশন
 
-প্লাস বোতামে সর্বোচ্চ ২ MB-এর PNG/JPEG অথবা ৪ MB-এর MP4/MOV বেছে নির্দেশ দিন। মূল bytes অপরিবর্তিতভাবে Storage-এ সেভ হয়। বড় ভিডিওর public HTTPS link চ্যাটে দিয়ে ভিডিও হিসেবে প্রকাশের নির্দেশ দিতে পারেন। Media পোস্টে ক্যাপশন খালি, অনুপস্থিত বা null হলে empty string হয়; Firestore-এ undefined field যায় না। Instagram ভিডিও container প্রস্তুত না হওয়া পর্যন্ত worker poll করে। Facebook ভিডিও একবার প্রকাশের অনুরোধ পাঠিয়ে processing শেষ হয়েছে কি না যাচাই করে। Platform-এর media format, দৈর্ঘ্য ও account permission লাগবে।
+প্লাস বোতামে সর্বোচ্চ ১০ MB-এর PNG/JPEG অথবা ১০০ MB-এর MP4/MOV বেছে নির্দেশ দিন। Browser signed URL-এ raw file পাঠায়; Base64 বা server-memory upload নয়। `firebase-storage-cors.json` production bucket-এ প্রয়োগ করতে হবে। মূল bytes অপরিবর্তিতভাবে Storage-এ সেভ হয় এবং default ৩০ দিন পরে cleanup হয়। Media পোস্টে ক্যাপশন খালি, অনুপস্থিত বা null হলে empty string হয়। Instagram/Facebook ভিডিও processing শেষ হওয়া পর্যন্ত worker provider state ধরে poll করে।
 
 ### চ্যাটের ব্যবহার
 

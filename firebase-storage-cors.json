@@ -1,0 +1,8 @@
+[
+  {
+    "origin": ["https://mt-personal-agent.netlify.app"],
+    "method": ["PUT"],
+    "responseHeader": ["Content-Type", "ETag"],
+    "maxAgeSeconds": 3600
+  }
+]

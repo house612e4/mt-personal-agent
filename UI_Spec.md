@@ -9,7 +9,7 @@
 v3.1: Brain-এর connection অংশে প্রত্যেক website-এর বাস্তব signed probe button ও তার ফল। Setting উপস্থিতি এবং actual probe আলাদা করে দেখাবে।
 
 
-মোবাইল আগে, বাংলা copy, system font stack, readable text এবং wrap হওয়া controls। ৬৫০px ও ১০৫০px layout breakpoints। নিচের JSON-এর মূল চার রং generated design-tokens.css-এ যায়; বাকি CSS public/style.css-এ। Generated file হাতে edit নয়।
+মোবাইল আগে, বাংলা copy, readable text এবং wrap হওয়া controls। ৭২০px-এ sidebar drawer হয়। নিচের JSON-এর মূল চার রং generated design-tokens.css-এ যায়; বাকি CSS public/style.css-এ। Generated file হাতে edit নয়।
 
 ## পর্দা ও controls
 
@@ -19,9 +19,9 @@ v3.1: Brain-এর connection অংশে প্রত্যেক website-এ�
 - Reports: শিরোনাম, ID/version, লেখা, expandable evidence/coverage, versioned editor।
 - Brain: text model, reasoning depth, instructions, memory, timezone, steps, AI daily budget, social/communication/website/deploy autonomy flags ও tool allowlist।
 - Settings: connection presence, Gmail OAuth, deployment setup। “সেটিং আছে” মানেই live token কার্যকর নয়।
-- আগের posting/drafts/account tools shortcut থেকে খোলা যায়।
+- পুরোনো posting/drafts/demo dashboard সরানো; প্রধান অভিজ্ঞতা chat-first।
 
-Request চললে shared busy lock controls ধরে। Agent jobs শুধু সক্রিয় পর্দা ও due/running কাজ থাকলে নির্দিষ্ট interval-এ poll হয়। Sensitive report, message ও job ফল textContent দিয়ে render হয়; external HTML execute নয়। Brain form dirty থাকলে background refresh লেখা overwrite করে না। Logout-এ state/timer/private rendered content পরিষ্কার।
+সাধারণ request চললে shared busy lock controls ধরে; দীর্ঘ chat stream-এ শুধু duplicate send বন্ধ থাকে। Agent jobs শুধু সক্রিয় পর্দা ও due/running কাজ থাকলে নির্দিষ্ট interval-এ poll হয়। Sensitive report, message ও job ফল textContent দিয়ে render হয়; external HTML execute নয়। Brain form dirty থাকলে background refresh লেখা overwrite করে না। Logout-এ state/timer/private rendered content পরিষ্কার।
 
 PWA manifest, icons ও service-worker shell caching রয়েছে। Offline cloud execution চলে না; ফোন offline হলেও deployed server-এর আগে-সেভ করা routine চলতে পারে। বাস্তব Android/iPhone visual/installation পরীক্ষা এখনো বাকি।
 
@@ -35,9 +35,6 @@ PWA manifest, icons ও service-worker shell caching রয়েছে। Offline 
     "--page-bg": "#f4f5ef",
     "--text": "#193c35"
   },
-  "breakpoints": [
-    650,
-    1050
-  ]
+  "breakpoints": [720]
 }
 ```

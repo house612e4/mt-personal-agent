@@ -1,6 +1,6 @@
-# MT Personal Agent — Technical requirements v3.1
+# MT Personal Agent — Technical requirements v6.0
 
-web-push dependency দিয়ে server VAPID Web Push পাঠাবে। API success-এর সঙ্গে processing শেষ হওয়া আলাদা করে দেখা হবে। ভিডিও max4MB app upload অথবা public link। মূল ফাইল রূপান্তর হয় না।
+web-push dependency দিয়ে server VAPID Web Push পাঠাবে এবং সাময়িক failure সর্বোচ্চ তিনবার retry হবে। API success-এর সঙ্গে processing শেষ হওয়া আলাদা করে দেখা হবে। ছবি সর্বোচ্চ ১০ MB ও ভিডিও সর্বোচ্চ ১০০ MB signed raw upload দিয়ে Storage-এ যাবে; মূল ফাইল রূপান্তর হয় না।
 
 নতুন chat.mjs আধুনিক Netlify default Request/Response handler, Firestore document listener দিয়ে SSE পাঠাবে। worker আলাদা থাকবে, ব্রাউজার বন্ধ হলেও ফল durable থাকবে। OpenAI stream parser completed event ছাড়া সফলতা গ্রহণ করবে না।
 
@@ -11,12 +11,12 @@ v3.1: adapters/site-bridge engine + source-specific overlay installer। MT Stud
 
 ## স্থির stack
 
-Vanilla ES modules frontend/PWA; Netlify Node Functions; Firebase Authentication, server-only Firestore, ঐচ্ছিক Firebase Storage। package.json version 4.3.0। Exact SDK/override versions ও deployment directories নিচের machine block-এ; package-lock.json authoritative। Build target Node 22+, বর্তমান v3 local automated validation Node 24-এ হয়েছে; Node 22 ও hosted build validation বাকি।
+Vanilla ES modules chat-first frontend/PWA; Netlify Node Functions; Firebase Authentication, server-only Firestore ও Firebase Storage। package.json version 6.0.0। Exact SDK/override versions ও deployment directories নিচের machine block-এ; package-lock.json authoritative। Build target Node 22+; hosted production validation deployment checklist অনুযায়ী হবে।
 
 ## runtime ও API
 
 - api.mjs: আগের owner-authenticated drafts/AI/Meta/manual publication।
-- agent.mjs: owner-authenticated chat command/state/jobs/brain/routine/report/trace/cancel/retry/structured image upload/Gmail connect। Attachment-এর উপস্থিতি টেক্সট হিসেবে model-কে জানানো হয়। ছবি মূল bytes-এ Storage-এ যায় এবং পোস্টে server সরাসরি সেই URL ব্যবহার করে।
+- agent.mjs: owner-authenticated chat command/state/jobs/brain/routine/report/trace/cancel/retry/signed media upload/Gmail connect/live verification। Attachment-এর উপস্থিতি টেক্সট হিসেবে model-কে জানানো হয়। মূল bytes Storage-এ যায় এবং পোস্টে server সরাসরি সেই URL ব্যবহার করে।
 - worker-background.mjs: INTERNAL_WORKER_SECRET bearer, durable job claim ও bounded execution; public unauthenticated execution নয়।
 - pulse.mjs: Netlify schedule */5 * * * *, production deployment-এ provider activation প্রয়োজন। Stale running >২০ মিনিট uncertain।
 - gmail-oauth.mjs: signed expiring one-time OAuth state, Gmail modify consent, encrypted refresh token। Gmail connector search/read/send/mark-read/archive সমর্থন করে; পুনরায় consent প্রয়োজন।
