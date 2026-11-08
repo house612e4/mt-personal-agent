@@ -23,7 +23,7 @@ test('same command request ID enqueues once',async()=>{const f=fixture();await f
 test('routine pause or version change cancels queued execution',async()=>{const f=fixture(),r=await f.store.saveRoutine({title:'দৈনিক',command:'পড়ো',time:'20:00',timezone:'UTC',days:[0,1,2,3,4,5,6],expectedVersion:0});const j=await f.store.enqueue({payload:{command:'পড়ো'},routineId:r.id,routineVersion:1});const old=await f.store.get('routines',r.id);await f.store.saveRoutine({...old,enabled:false,expectedVersion:1});assert.equal(await f.store.claim(j.id),null);assert.equal((await f.store.get('jobs',j.id)).status,'cancelled');});
 test('routine tick creates one occurrence across repeat pulses',async()=>{const f=fixture(),r=await f.store.saveRoutine({title:'দৈনিক',command:'পড়ো',time:'20:00',timezone:'UTC',days:[0,1,2,3,4,5,6],expectedVersion:0});const ref=f.store.col('routines').doc(r.id);await ref.update({nextRunAt:new Date(Date.now()-60000).toISOString()});await Promise.all([f.store.dueRoutines(),f.store.dueRoutines()]);assert.equal((await f.store.list('jobs')).length,1);});
 test('report correction preserves evidence and previous body',async()=>{const f=fixture(),r=await f.store.saveReport({title:'রিপোর্ট',body:'প্রথম লেখা',evidence:[{source:'gmail',loaded:2}]});await f.store.editReport({id:r.id,expectedVersion:1,body:'সংশোধন'});const current=await f.store.get('reports',r.id);assert.equal(current.version,2);assert.equal(current.evidence[0].loaded,2);assert.equal(f.rows.get('owners/owner/reports/'+r.id+'/history/1').body,'প্রথম লেখা');await assert.rejects(()=>f.store.editReport({id:r.id,expectedVersion:1,body:'পুরোনো'}));});
-test('brain updates are versioned and permission flags are explicit',async()=>{const f=fixture();await f.store.saveBrain({...DEFAULT_BRAIN,expectedVersion:0,instructions:'নতুন নিয়ম'});await assert.rejects(()=>f.store.saveBrain({...DEFAULT_BRAIN,expectedVersion:0}));const b=brainInput({...DEFAULT_BRAIN,maxSteps:99});assert.equal(b.maxSteps,8);assert.throws(()=>requireWrite(DEFAULT_BRAIN,{},'social'));assert.throws(()=>requireWrite({...DEFAULT_BRAIN,automaticSocial:true},{routineId:'x',allowWrites:false},'social'));});
+test('brain updates are versioned and permission flags are explicit',async()=>{const f=fixture();await f.store.saveBrain({...DEFAULT_BRAIN,expectedVersion:0,instructions:'নতুন নিয়ম'});await assert.rejects(()=>f.store.saveBrain({...DEFAULT_BRAIN,expectedVersion:0}));const b=brainInput({...DEFAULT_BRAIN,maxSteps:99});assert.equal(b.maxSteps,12);assert.throws(()=>requireWrite(DEFAULT_BRAIN,{},'social'));assert.throws(()=>requireWrite(DEFAULT_BRAIN,{},'communication'));assert.throws(()=>requireWrite({...DEFAULT_BRAIN,automaticSocial:true},{routineId:'x',allowWrites:false},'social'));});
 test('agent executes a tool and uses its real result',async()=>{let step=0,called=0;const result=await agentLoop({brain:DEFAULT_BRAIN,command:'রিপোর্ট দেখাও',request:async()=>++step===1?{output:[{type:'function_call',name:'list_reports',call_id:'c1',arguments:'{}'}]}:{output:[{type:'message',content:[{type:'output_text',text:'একটি রিপোর্ট পাওয়া গেছে।'}]}]},runTool:async()=>{called++;return[{id:'report'}]}});assert.equal(called,1);assert.match(result,/রিপোর্ট/);});
 test('chat attachment is omitted from AI input and image tools stay disabled even for legacy brain settings',async()=>{
  let payload,calls=0;
@@ -35,7 +35,7 @@ test('chat attachment is omitted from AI input and image tools stay disabled eve
  });
  assert.equal(calls,0);assert.equal(answer,'বস, কোন পেজে?');
  assert.match(payload.input.at(-1).content,/বাড়তি ধাপ, AI কল/);
- assert.match(payload.input.at(-1).content,/মূল ছবি সংযুক্ত আছে/);
+ assert.match(payload.input.at(-1).content,/মূল মিডিয়া সংযুক্ত আছে/);
  assert.doesNotMatch(JSON.stringify(payload),/original[.]jpg|input_image|edit_uploaded_image|generate_image/);
 });
 
@@ -223,4 +223,99 @@ test('a chat-only reply is stored as conversation and excluded from todays task 
  const saved=await f.store.get('jobs',command.id);
  assert.equal(saved.result,'বস, আছি। বলো।');assert.equal(saved.taskActivity,false);
  assert.deepEqual(await f.store.todayJobs('America/New_York'),[]);
+});
+
+test('media captions may be omitted, null, empty or whitespace without invalid Firestore fields',async()=>{
+ const {initializeApp}=await import('firebase-admin/app');const {getFirestore}=await import('firebase-admin/firestore');
+ const firestore=getFirestore(initializeApp({projectId:'local-caption-check'},'caption-matrix'));
+ for(const caption of [undefined,null,'','   ']){
+  const f=fixture();await f.store.saveBrain({...DEFAULT_BRAIN,automaticSocial:true,expectedVersion:0});
+  const args={accountKey:'mt-studio',platform:'facebook',imageUrl:'uploaded',scheduleAt:'',...(caption===undefined?{}:{caption})};
+  const service=createAgentService({db:f.db,uid:'owner',env:{OPENAI_API_KEY:'test'},connectors:{},http:async()=>({output:[{type:'function_call',name:'prepare_post',call_id:'media',arguments:JSON.stringify(args)}]})});
+  const result=await service.execute({id:'caption-matrix-job',kind:'command',payload:{command:'ছবিটি পোস্ট করো',media:{url:'https://example.com/original.jpg',contentType:'image/jpeg'}}});
+  assert.equal(result.status,'succeeded');
+  const job=(await f.store.list('jobs')).find(job=>job.kind==='social');
+  assert.equal(job.payload.caption,caption??'');
+  assert.doesNotThrow(()=>firestore.batch().set(firestore.doc('local/post'),job));
+ }
+});
+
+test('Instagram video processing reuses the same container until it is ready',async()=>{
+ const f=fixture(),calls=[];let ready=false;
+ const connector=createConnectors({store:f.store,env:{DRY_RUN:'false',META_GRAPH_VERSION:'v23.0',MT_STUDIO_PAGE_TOKEN:'test',MT_STUDIO_INSTAGRAM_ID:'123'},http:async(url,opt)=>{
+  calls.push({url,method:opt.method,body:opt.body?JSON.parse(opt.body):null});
+  if(url.endsWith('/123/media'))return{id:'container-1'};
+  if(url.includes('fields=status_code'))return{status_code:ready?'FINISHED':'IN_PROGRESS'};
+  if(url.endsWith('/123/media_publish'))return{id:'published-1'};
+  throw Error('unexpected endpoint');
+ }});
+ const payload={accountKey:'mt-studio',platform:'instagram',mediaType:'video',imageUrl:'https://example.com/reel.mp4',caption:''};
+ const first=await connector.publish(payload);assert.equal(first.pending,true);
+ const waiting=await connector.publish(payload,first.providerState);assert.equal(waiting.pending,true);
+ ready=true;const final=await connector.publish(payload,first.providerState);assert.equal(final.id,'published-1');
+ assert.equal(calls.filter(call=>call.url.endsWith('/123/media')).length,1);
+ assert.equal(calls.filter(call=>call.url.endsWith('/123/media_publish')).length,1);
+});
+
+test('a deferred video job persists provider state for the next worker pass',async()=>{
+ const f=fixture();await f.store.saveBrain({...DEFAULT_BRAIN,automaticSocial:true,expectedVersion:0});
+ let stateSeen=null;
+ const service=createAgentService({db:f.db,uid:'owner',connectors:{publish:async(payload,state)=>{
+  stateSeen=state;return state?{id:'published'}:{pending:true,providerState:{containerId:'same-container'},reason:'প্রস্তুত হচ্ছে।'};
+ }}});
+ const {id}=await f.store.enqueue({kind:'social',payload:{platform:'instagram',mediaType:'video',caption:'',imageUrl:'https://example.com/a.mp4'},allowWrites:true});
+ await service.drain();const queued=await f.store.get('jobs',id);assert.equal(queued.status,'queued');assert.equal(queued.providerState.containerId,'same-container');
+ await f.store.col('jobs').doc(id).update({runAt:new Date(Date.now()-1000).toISOString()});
+ await service.drain();assert.equal(stateSeen.containerId,'same-container');assert.equal((await f.store.get('jobs',id)).status,'succeeded');
+});
+
+test('different conversations do not share their previous messages with the model',async()=>{
+ const f=fixture();
+ const one=await f.store.enqueue({payload:{command:'প্রথম চ্যাটের কথা',conversationId:'conversation-one'}});await f.store.finish(one.id,'succeeded','প্রথম উত্তর',false);
+ const two=await f.store.enqueue({payload:{command:'দ্বিতীয় চ্যাটের গোপন কথা',conversationId:'conversation-two'}});await f.store.finish(two.id,'succeeded','দ্বিতীয় উত্তর',false);
+ let input;
+ const service=createAgentService({db:f.db,uid:'owner',env:{OPENAI_API_KEY:'test'},connectors:{},http:async(url,opt)=>{input=JSON.parse(opt.body).input;return{output:[{type:'message',content:[{type:'output_text',text:'উত্তর'}]}]};}});
+ await service.execute({id:'new-chat-turn',kind:'command',payload:{command:'আগের কথা মনে আছে?',conversationId:'conversation-one'}});
+ assert.match(JSON.stringify(input),/প্রথম চ্যাটের কথা/);assert.doesNotMatch(JSON.stringify(input),/দ্বিতীয় চ্যাট/);
+});
+
+test('Facebook video uploads only once and verifies processing before reporting completion',async()=>{
+ const f=fixture(),calls=[];
+ const connector=createConnectors({store:f.store,env:{DRY_RUN:'false',META_GRAPH_VERSION:'v23.0',MT_STUDIO_PAGE_TOKEN:'test',MT_STUDIO_PAGE_ID:'123'},http:async(url,opt)=>{
+  calls.push({url,method:opt.method,body:opt.body?JSON.parse(opt.body):null});
+  return opt.method==='POST'?{id:'video-id'}:{status:{video_status:'ready'}};
+ }});
+ const payload={accountKey:'mt-studio',platform:'facebook',mediaType:'video',imageUrl:'https://example.com/original.mp4'};
+ const upload=await connector.publish(payload);assert.equal(upload.pending,true);
+ const result=await connector.publish(payload,upload.providerState);assert.equal(result.id,'video-id');
+ assert.equal(calls.filter(call=>call.method==='POST').length,1);assert.equal(calls[0].body.description,'');
+ assert.equal(calls[0].body.file_url,payload.imageUrl);
+});
+
+test('reasoning profile and durable relevant memory are supplied to complex commands',async()=>{
+ const f=fixture();await f.store.remember('Golapi পোস্টে ছোট বাংলা ক্যাপশন ব্যবহার করবে।');await f.store.remember('MT Studio-এর রং সবুজ।');
+ const context=await f.store.memoryContext('Golapi পোস্টের ক্যাপশন লিখো');assert.match(context,/Golapi পোস্টে/);
+ let payload;await agentLoop({brain:{...DEFAULT_BRAIN,reasoningEffort:'high'},command:'কাজ করো',memoryContext:context,request:async value=>{payload=value;return{output:[{type:'message',content:[{type:'output_text',text:'হয়েছে।'}]}]}},runTool:async()=>{}});
+ assert.equal(payload.reasoning.effort,'high');assert.equal(payload.max_output_tokens,25000);assert.match(payload.instructions,/RELEVANT DURABLE MEMORY/);
+});
+
+test('connected communication adapters send Gmail, WhatsApp and Telegram only to validated recipients',async()=>{
+ const f=fixture(),calls=[];
+ const env={GOOGLE_CLIENT_ID:'google-id',GOOGLE_CLIENT_SECRET:'google-secret',GMAIL_REFRESH_TOKEN:'refresh',META_GRAPH_VERSION:'v23.0',WHATSAPP_PHONE_NUMBER_ID:'123',WHATSAPP_TOKEN:'wa-token',TELEGRAM_BOT_TOKEN:'tg-token'};
+ const connectors=createConnectors({store:f.store,env,http:async(url,opt={})=>{
+  calls.push({url,body:opt.body});if(url.includes('oauth2.googleapis.com'))return{access_token:'access'};
+  if(url.includes('/messages/send'))return{id:'gmail-1',threadId:'thread-1'};
+  if(url.includes('graph.facebook.com'))return{messages:[{id:'wa-1'}]};
+  if(url.includes('api.telegram.org'))return{ok:true,result:{message_id:7}};throw Error('unexpected '+url);
+ }});
+ assert.equal((await connectors.communication({channel:'gmail',action:'send',recipient:'owner@example.com',subject:'পরীক্ষা',body:'ইমেইল',messageId:'',query:'',templateName:'',language:''})).id,'gmail-1');
+ assert.equal((await connectors.communication({channel:'whatsapp',action:'send',recipient:'+15551234567',subject:'',body:'বার্তা',messageId:'',query:'',templateName:'',language:''})).id,'wa-1');
+ assert.equal((await connectors.communication({channel:'telegram',action:'send',recipient:'12345',subject:'',body:'বার্তা',messageId:'',query:'',templateName:'',language:''})).id,7);
+ await assert.rejects(()=>connectors.communication({channel:'gmail',action:'send',recipient:'not-an-email',subject:'x',body:'x'}),/email address/);
+ assert.equal(calls.filter(call=>/messages\/send|graph\.facebook|api\.telegram/.test(call.url)).length,3);
+});
+
+test('Instagram live probe verifies the configured account ID with its page token',async()=>{
+ const f=fixture();const connector=createConnectors({store:f.store,env:{META_GRAPH_VERSION:'v23.0',MT_STUDIO_INSTAGRAM_ID:'987',MT_STUDIO_PAGE_TOKEN:'token'},http:async()=>({id:'987',username:'mtstudio',media_count:12})});
+ assert.deepEqual(await connector.instagramAccount('mt-studio'),{id:'987',username:'mtstudio',mediaCount:12,live:true});
 });
