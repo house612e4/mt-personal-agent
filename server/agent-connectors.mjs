@@ -27,8 +27,26 @@ export function createConnectors({store,env=process.env,http=remoteJSON}){
  };
  const emailList=value=>{const list=String(value||'').split(',').map(x=>x.trim()).filter(Boolean);if(!list.length||list.length>10||list.some(x=>!/^[^\s<>@,]+@[^\s<>@,]+\.[^\s<>@,]+$/.test(x)))throw new AppError(400,'প্রাপকের সঠিক email address দাও।');return list.join(', ');};
  const gh=async(k,path,body)=>{const s=site(k),repo=required(s.prefix+'_GITHUB_REPO');if(!/^[\w.-]+\/[\w.-]+$/.test(repo))throw new AppError(503,'Repository owner/name দিন।');return http(`https://api.github.com/repos/${repo}${path}`,{method:body?'POST':'GET',headers:{Authorization:`Bearer ${required('GITHUB_AGENT_TOKEN')}`,Accept:'application/vnd.github+json','Content-Type':'application/json'},...(body?{body:JSON.stringify(body)}:{})},'GitHub');};
+	 const websiteCall=async(k,action,documentId='',patch={},operationId=randomUUID())=>{
+	  const s=site(k);if(!actionInfo(k,action))throw new AppError(400,'এই সাইটে action নেই; আগে capabilities পড়ুন।');const url=new URL(required(s.prefix+'_BRIDGE_URL'));
+	  if(url.protocol!=='https:'||![s.domain,'www.'+s.domain].includes(url.hostname)||url.username||url.password)throw new AppError(503,'Bridge URL নিজের নির্ধারিত website domain-এ হতে হবে।');
+	  const body=JSON.stringify({action,documentId,patch,operationId}),timestamp=String(Date.now()),nonce=randomUUID(),signature=createHmac('sha256',required(s.prefix+'_BRIDGE_KEY')).update(timestamp+'.'+nonce+'.'+body).digest('hex');
+	  const result=await http(url.href,{method:'POST',headers:{'Content-Type':'application/json','X-Agent-Time':timestamp,'X-Agent-Nonce':nonce,'X-Agent-Signature':signature},body},s.domain);if(result.protocol!=='mt-agent-site/3.1'||result.site!==k)throw new AppError(503,'সাইটের v3.1 bridge deploy/matching profile যাচাই করুন।');return result;
+	 };
  return{
   status:async()=>({whatsAppChat,telegramChat,gmail:!!(env.GOOGLE_CLIENT_ID&&env.GOOGLE_CLIENT_SECRET&&(env.GMAIL_REFRESH_TOKEN||(await store.col('config').doc('gmail').get()).exists)),whatsapp:!!(env.WHATSAPP_PHONE_NUMBER_ID&&env.META_APP_SECRET&&env.WHATSAPP_VERIFY_TOKEN),facebookPersonal:!!env.PERSONAL_FACEBOOK_USER_TOKEN,facebook:Object.entries(SITES).map(([key,s])=>({key,configured:!!(env[s.prefix+'_PAGE_ID']&&env[s.prefix+'_PAGE_TOKEN']&&env.META_GRAPH_VERSION)})),sites:Object.entries(SITES).map(([key,s])=>({key,bridge:!!(env[s.prefix+'_BRIDGE_URL']&&env[s.prefix+'_BRIDGE_KEY']),repository:!!(env[s.prefix+'_GITHUB_REPO']&&env.GITHUB_AGENT_TOKEN)})),instagram:Object.entries(SITES).map(([key,s])=>({key,configured:!!(env[s.prefix+'_INSTAGRAM_ID']&&env[s.prefix+'_PAGE_TOKEN'])}))}),
+	  verify:async()=>{
+	   const checks=[],run=async(name,fn)=>{try{const detail=await fn();checks.push({name,ok:true,detail});}catch(error){checks.push({name,ok:false,error:error.status?error.message:'লাইভ যাচাই ব্যর্থ হয়েছে।'});}};
+	   if(env.GOOGLE_CLIENT_ID&&env.GOOGLE_CLIENT_SECRET)await run('Gmail',async()=>{const headers=await gmailHeaders(),profile=await http('https://gmail.googleapis.com/gmail/v1/users/me/profile',{headers},'Gmail');return profile.emailAddress||'connected';});
+	   if(env.WHATSAPP_PHONE_NUMBER_ID&&env.WHATSAPP_TOKEN)await run('WhatsApp',async()=>{const data=await graph(`${required('WHATSAPP_PHONE_NUMBER_ID')}?fields=id,display_phone_number,verified_name`,required('WHATSAPP_TOKEN'));return data.display_phone_number||data.id;});
+	   if(env.TELEGRAM_BOT_TOKEN)await run('Telegram',async()=>{const data=await http(`https://api.telegram.org/bot${required('TELEGRAM_BOT_TOKEN')}/getMe`,{},'Telegram');if(!data.ok)throw new AppError(502,'Telegram bot যাচাই হয়নি।');return data.result?.username||String(data.result?.id||'connected');});
+	   for(const [key,s] of Object.entries(SITES)){
+	    if(env[s.prefix+'_PAGE_ID']&&env[s.prefix+'_PAGE_TOKEN'])await run(`${key} Facebook`,async()=>{const id=required(s.prefix+'_PAGE_ID'),page=await graph(`${id}?fields=id,name`,required(s.prefix+'_PAGE_TOKEN'));if(page.id!==id)throw new AppError(409,'Page ID ও token মিলছে না।');return page.name||page.id;});
+	    if(env[s.prefix+'_INSTAGRAM_ID']&&env[s.prefix+'_PAGE_TOKEN'])await run(`${key} Instagram`,async()=>{const id=required(s.prefix+'_INSTAGRAM_ID'),account=await graph(`${id}?fields=id,username`,required(s.prefix+'_PAGE_TOKEN'));if(account.id!==id)throw new AppError(409,'Instagram ID ও token মিলছে না।');return account.username||account.id;});
+	    if(env[s.prefix+'_BRIDGE_URL']&&env[s.prefix+'_BRIDGE_KEY'])await run(`${key} website`,async()=>{const result=await websiteCall(key,'capabilities');return result.domain||'connected';});
+	   }
+	   return checks;
+	  },
   sendOwnerReply:async(source,recipient,text)=>{
    if(source==='whatsapp'&&whatsAppChat&&recipient===whatsAppOwner){
     const phoneId=required('WHATSAPP_PHONE_NUMBER_ID');
@@ -99,12 +117,7 @@ export function createConnectors({store,env=process.env,http=remoteJSON}){
   }
   throw new AppError(400,'যোগাযোগের channel সঠিক নয়।');
  },
- website:async(k,action,documentId='',patch={},operationId=randomUUID())=>{
-  const s=site(k);if(!actionInfo(k,action))throw new AppError(400,'এই সাইটে action নেই; আগে capabilities পড়ুন।');const url=new URL(required(s.prefix+'_BRIDGE_URL'));
-  if(url.protocol!=='https:'||![s.domain,'www.'+s.domain].includes(url.hostname)||url.username||url.password)throw new AppError(503,'Bridge URL নিজের নির্ধারিত website domain-এ হতে হবে।');
-  const body=JSON.stringify({action,documentId,patch,operationId}),timestamp=String(Date.now()),nonce=randomUUID(),signature=createHmac('sha256',required(s.prefix+'_BRIDGE_KEY')).update(timestamp+'.'+nonce+'.'+body).digest('hex');
-  const result=await http(url.href,{method:'POST',headers:{'Content-Type':'application/json','X-Agent-Time':timestamp,'X-Agent-Nonce':nonce,'X-Agent-Signature':signature},body},s.domain);if(result.protocol!=='mt-agent-site/3.1'||result.site!==k)throw new AppError(503,'সাইটের v3.1 bridge deploy/matching profile যাচাই করুন।');return result;
- },
+	  website:websiteCall,
  publish:async(payload,providerState=null)=>{
   const s=site(payload.accountKey),token=required(s.prefix+'_PAGE_TOKEN'),id=required(s.prefix+(payload.platform==='instagram'?'_INSTAGRAM_ID':'_PAGE_ID'));
   if(!/^\d+$/.test(id))throw new AppError(503,'Meta account ID সঠিক নয়।');

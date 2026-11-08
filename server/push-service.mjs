@@ -43,8 +43,9 @@ export function createPushService({store,env=process.env,send=webpush.sendNotifi
    const ref=store.col('jobs').doc(job.id);
    const claimed=await store.db.runTransaction(async tx=>{
     const snapshot=await tx.get(ref);
-    if(!snapshot.exists||snapshot.data().pushStatus)return false;
-    tx.update(ref,{pushStatus:'sending'});return true;
+    if(!snapshot.exists)return false;const data=snapshot.data(),attempts=Number(data.pushAttempts)||0,attempted=Date.parse(data.pushAttemptedAt||'');
+    if(['sent','partial'].includes(data.pushStatus)||attempts>=3||data.pushStatus==='sending'&&Date.now()-attempted<5*60_000)return false;
+    tx.update(ref,{pushStatus:'sending',pushAttempts:attempts+1,pushAttemptedAt:new Date().toISOString()});return true;
    });
    if(!claimed)return{status:'already_attempted'};
    const body=status==='succeeded'?(job.kind==='social'?'তোমার পোস্ট প্রকাশ হয়েছে।':'তোমার উত্তরের কাজ শেষ। চ্যাট খুলে দেখো।'):'কাজটিতে তোমার নজর দরকার। চ্যাটে বিস্তারিত আছে।';
@@ -59,7 +60,12 @@ export function createPushService({store,env=process.env,send=webpush.sendNotifi
     }
    }));
    const outcome=results.every(Boolean)?'sent':results.some(Boolean)?'partial':'failed';
-   await ref.update({pushStatus:outcome});return{status:outcome};
+   await ref.update({pushStatus:outcome,pushFinishedAt:new Date().toISOString()});return{status:outcome};
+  },
+  retryPending:async()=>{
+   if(!ready)return{retried:0};const rows=await store.list('jobs','createdAt',50),terminal=new Set(['succeeded','attention','blocked','failed','uncertain','cancelled']);let retried=0;
+   for(const job of rows){if(!terminal.has(job.status)||!['failed','sending'].includes(job.pushStatus))continue;if(job.pushStatus==='sending'&&Date.now()-Date.parse(job.pushAttemptedAt||'')<5*60_000)continue;await createPushService({store,env,send}).notify(job,job.status);retried++;if(retried>=10)break;}
+   return{retried};
   }
  };
 }

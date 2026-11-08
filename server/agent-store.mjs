@@ -2,7 +2,7 @@ import contract from '../public/project-contract.js';
 import {randomUUID} from 'node:crypto';
 import {DEFAULT_BRAIN,TOOL_NAMES,bounded,versionCheck,brainInput,routineInput,nextOccurrence,stableId,localDate} from './agent-core.mjs';
 import {AppError} from './core.mjs';
-export function createStore(db,uid){
+export function createStore(db,uid,env=process.env){
  const owner=db.collection(contract.schema.paths.owners).doc(uid),col=name=>owner.collection(contract.schema.paths[name]||name);
  const brainRef=col('config').doc('brain');
  const get=async(name,id)=>{if(typeof id!=='string'||!/^[A-Za-z0-9-]{10,100}$/.test(id))throw new AppError(400,'ID সঠিক নয়।');const s=await col(name).doc(id).get();if(!s.exists)throw new AppError(404,'তথ্য পাওয়া যায়নি।');return{...s.data(),id:s.id}};
@@ -10,7 +10,8 @@ export function createStore(db,uid){
  return{db,uid,col,get,list,
   brain:async()=>{const s=await brainRef.get(),{imageModel,dailyImages,...stored}=s.data()||{};
    const legacy=Number(stored.capabilityVersion||0)<DEFAULT_BRAIN.capabilityVersion;
-   const brain={...DEFAULT_BRAIN,...stored,...(legacy?{capabilityVersion:DEFAULT_BRAIN.capabilityVersion,model:DEFAULT_BRAIN.model,reasoningEffort:DEFAULT_BRAIN.reasoningEffort,maxSteps:DEFAULT_BRAIN.maxSteps}:{})};brain.enabledTools=TOOL_NAMES.filter(name=>!Array.isArray(brain.enabledTools)||brain.enabledTools.includes(name));return brain;},
+   const configuredModel=env.OPENAI_AGENT_MODEL||env.OPENAI_MODEL||DEFAULT_BRAIN.model;
+   const brain={...DEFAULT_BRAIN,model:configuredModel,...stored,...(legacy?{capabilityVersion:DEFAULT_BRAIN.capabilityVersion,model:configuredModel,reasoningEffort:DEFAULT_BRAIN.reasoningEffort,maxSteps:DEFAULT_BRAIN.maxSteps}:{})};brain.enabledTools=TOOL_NAMES.filter(name=>!Array.isArray(brain.enabledTools)||brain.enabledTools.includes(name));return brain;},
   todayJobs:async(timezone,now=Date.now())=>{
    const date=localDate(now,timezone),window=26*60*60000;
    const from=new Date(now-window).toISOString(),to=new Date(now+window).toISOString();
@@ -29,6 +30,8 @@ export function createStore(db,uid){
   },
   saveBrain:async b=>{const input=brainInput(b);await db.runTransaction(async tx=>{const s=await tx.get(brainRef);versionCheck(s.data(),b.expectedVersion);if(s.exists)tx.set(brainRef.collection('history').doc(String(s.data().version)),{...s.data(),savedAt:new Date().toISOString()});tx.set(brainRef,{...input,version:(s.data()?.version||0)+1,updatedAt:new Date().toISOString()});});return{ok:true};},
   remember:async note=>{const text=bounded(note,2000),ref=col('memories').doc(randomUUID()),now=new Date().toISOString();await ref.set({text,createdAt:now,updatedAt:now});return{ok:true,id:ref.id};},
+	  listMemories:async()=>{const snapshot=await col('memories').orderBy('updatedAt','desc').limit(50).get();return snapshot.docs.map(doc=>({id:doc.id,text:doc.data().text,updatedAt:doc.data().updatedAt}));},
+	  deleteMemory:async id=>{const memory=await get('memories',id);await col('memories').doc(memory.id).delete();return{ok:true,id:memory.id};},
   memoryContext:async command=>{
    const snapshot=await col('memories').orderBy('updatedAt','desc').limit(100).get();
    const terms=value=>new Set(String(value).toLocaleLowerCase('bn').match(/[\p{L}\p{N}]{2,}/gu)||[]),wanted=terms(command);
