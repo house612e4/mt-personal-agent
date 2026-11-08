@@ -1,4 +1,4 @@
-const CACHE='mt-agent-shell-v9';
+const CACHE='mt-agent-shell-v10';
 const FILES=['/','/index.html','/style.css','/app.js','/agent-ui.js','/chat-stream.js','/project-contract.js','/design-tokens.css','/fonts/noto-sans-bengali-bengali-wght-normal.woff2','/fonts/noto-sans-bengali-latin-wght-normal.woff2','/icon.svg','/manifest.webmanifest','/icon-192.png','/icon-512.png'];
 self.addEventListener('install',e=>e.waitUntil(caches.open(CACHE).then(c=>c.addAll(FILES)).then(()=>self.skipWaiting())));
 self.addEventListener('activate',e=>e.waitUntil(caches.keys().then(ks=>Promise.all(ks.filter(k=>k.startsWith('mt-agent-')&&k!==CACHE).map(k=>caches.delete(k)))).then(()=>self.clients.claim())));

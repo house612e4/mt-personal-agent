@@ -39,6 +39,7 @@ export default {
         "list_reports",
         "revise_report",
         "remember",
+        "manage_memory",
         "manage_routine",
         "merge_code_change",
         "deployment_status",
@@ -74,8 +75,7 @@ export default {
       "--text": "#193c35"
     },
     "breakpoints": [
-      650,
-      1050
+      720
     ]
   },
   "tech": {

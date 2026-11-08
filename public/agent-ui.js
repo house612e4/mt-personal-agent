@@ -32,8 +32,9 @@ export function mountAgent({request,send=null,lock=()=>{}}){
  function notice(text){$('agentNotice').textContent=text;}
  async function run(button,fn){
   if(busy)return;
-  busy=true;lock(true);
+  busy=true;
   const old=button.textContent,isSend=button===$('agentSend');
+  lock(!isSend);
   const keepIcon=isSend||Boolean(button.querySelector?.('svg'));
   button.disabled=true;
   if(isSend)$('agentCommand').disabled=false;
@@ -130,6 +131,12 @@ export function mountAgent({request,send=null,lock=()=>{}}){
  async function refresh(){const e=epoch;const result=await request('state',{conversationId});if(e!==epoch)return;state=result;restoreAvatar();render();if(!timer)timer=setInterval(()=>{if(!document.hidden&&!$('app').hidden&&!$('agent').hidden&&!busy&&!polling&&state&&(state.jobs.some(isPending)||(state.today||[]).some(isPending)||state.routines.some(r=>r.enabled&&Date.parse(r.nextRunAt)<=Date.now())))pollJobs().catch(()=>{});},contract.product.agent.pollMs);}
  const readFile=file=>new Promise((resolve,reject)=>{const reader=new FileReader();reader.onload=()=>resolve(String(reader.result));reader.onerror=reject;reader.readAsDataURL(file);});
  const validImage=(file,limit)=>file&&['image/png','image/jpeg','video/mp4','video/quicktime'].includes(file.type)&&file.size>0&&file.size<=limit;
+ async function uploadMedia(file){
+  const prepared=await request('upload_prepare',{contentType:file.type,size:file.size});
+  const uploaded=await fetch(prepared.uploadUrl,{method:'PUT',headers:{'Content-Type':file.type},body:file,signal:AbortSignal.timeout(10*60_000)});
+  if(!uploaded.ok)throw Error('Storage-এ ফাইল পাঠানো যায়নি। Firebase Storage CORS ও bucket পরীক্ষা করো।');
+  return request('upload_finalize',{uploadId:prepared.uploadId});
+ }
  function showAvatar(url){$('agentAvatar').src=url||'';$('agentAvatar').hidden=!url;$('agentAvatarInitial').hidden=!!url;}
  function restoreAvatar(){try{showAvatar(localStorage.getItem(avatarKey));}catch{showAvatar(null);}}
  $('agentName').textContent=name;
@@ -147,7 +154,7 @@ export function mountAgent({request,send=null,lock=()=>{}}){
  $('agentChooseImage').onclick=()=>{if(!busy)$('agentImage').click();};
  $('agentImage').onchange=()=>{
   const file=$('agentImage').files?.[0];if(!file||busy)return;
-  if(!validImage(file,file.type.startsWith('video/')?4000000:2000000)){$('agentImage').value='';notice('ছবি সর্বোচ্চ ২ MB ও MP4/MOV ভিডিও সর্বোচ্চ ৪ MB দাও।');return;}
+  if(!validImage(file,file.type.startsWith('video/')?100000000:10000000)){$('agentImage').value='';notice('ছবি সর্বোচ্চ ১০ MB ও MP4/MOV ভিডিও সর্বোচ্চ ১০০ MB দাও।');return;}
   clearAttachment();attachment={file,preview:URL.createObjectURL(file),media:null};
   const box=$('agentAttachment'),video=file.type.startsWith('video/'),image=el(video?'video':'img','attachment-preview');image.src=attachment.preview;image.alt='সংযুক্ত মিডিয়া';if(video){image.muted=true;image.playsInline=true;}
   const remove=el('button','quiet','সরান');remove.type='button';remove.onclick=()=>{if(!busy)clearAttachment();};
@@ -172,9 +179,7 @@ export function mountAgent({request,send=null,lock=()=>{}}){
  $('agentSend').onclick=()=>run($('agentSend'),async()=>{
   const e=epoch,command=$('agentCommand').value.trim(),selected=attachment;if(!command)throw Error('বার্তাটি লিখুন।');
   if(selected&&!selected.media){
-   const base64=(await readFile(selected.file)).split(',')[1];
-   if(e!==epoch)return;
-   selected.media=await request('upload',{base64});
+   selected.media=await uploadMedia(selected.file);
   }
   if(e!==epoch)return;
   if(!pending||pending.command!==command||pending.media!==selected?.media)pending={requestId:crypto.randomUUID(),command,conversationId,...(selected?{media:selected.media}:{})};
@@ -246,6 +251,11 @@ export function mountAgent({request,send=null,lock=()=>{}}){
   if(subscription){await request('push_unsubscribe',{endpoint:subscription.endpoint});await subscription.unsubscribe();}
   $('pushNotice').textContent='এই ডিভাইসের নোটিফিকেশন বন্ধ হয়েছে।';
  });
+	 $('liveVerify').onclick=()=>run($('liveVerify'),async()=>{
+	  const data=await request('live_verify'),box=$('liveVerifyResult');box.replaceChildren();
+	  for(const item of data.checks)box.append(el('p',item.ok?'verify-ok':'verify-failed',`${item.ok?'✓':'✕'} ${item.name} — ${item.ok?(item.detail||'সফল'):(item.error||'ব্যর্থ')}`));
+	  notice(data.ok?'সব কনফিগার করা সংযোগের লাইভ যাচাই সফল।':'কিছু সংযোগে সমস্যা আছে। সেটআপের ফল দেখো।');
+	 });
  $('brainForm').oninput=()=>{brainDirty=true;};
  $('brainForm').onsubmit=e=>{e.preventDefault();run($('brainSave'),async()=>{await request('brain',{expectedVersion:brainVersion,model:$('brainModel').value,reasoningEffort:$('brainReasoning').value,instructions:$('brainInstructions').value,memory:$('brainMemory').value,timezone:$('brainZone').value,dailyAiCalls:Number($('brainDailyCalls').value),maxSteps:Number($('brainSteps').value),automaticSocial:$('brainSocial').checked,automaticCommunication:$('brainCommunication').checked,automaticWebsite:$('brainWebsite').checked,automaticDeploy:$('brainDeploy').checked,enabledTools:[...document.querySelectorAll('#brainTools input:checked')].map(e=>e.value)});brainDirty=false;await refresh();notice('ব্রেন সংরক্ষণ হয়েছে।');});};
  async function loadCalendar(month){
@@ -274,5 +284,5 @@ export function mountAgent({request,send=null,lock=()=>{}}){
  $('routineNew').onclick=()=>{if(!busy)routineForm(null);};
  $('routineForm').onsubmit=e=>{e.preventDefault();run($('routineSave'),async()=>{await request('routine',{id:$('routineId').value||undefined,expectedVersion:Number($('routineVersion').value),title:$('routineTitle').value,command:$('routineCommand').value,time:$('routineTime').value,timezone:$('routineZone').value,days:[...document.querySelectorAll('#routineDays input:checked')].map(e=>Number(e.value)),enabled:$('routineEnabled').checked,allowWrites:$('routineWrites').checked});routineForm(null);await refresh();if($('workCalendar').open)await loadCalendar(calendarMonth);notice('রুটিন সংরক্ষণ হয়েছে।');});};
  $('reportSave').onclick=()=>run($('reportSave'),async()=>{if(!editReport)return;await request('report',{id:editReport.id,expectedVersion:editReport.version,body:$('reportBody').value});editReport=null;$('reportEditor').hidden=true;await refresh();notice('সংশোধন সংরক্ষণ হয়েছে; আগের সংস্করণ ও evidence রাখা আছে।');});
-  return{refresh,reset(){++epoch;if(timer)clearInterval(timer);timer=null;state=null;pending=null;conversationId='main';$('conversationList').replaceChildren();$('pushNotice').textContent='';drawer(false);calendarMonth=null;++calendarRequest;$('workCalendar').open=false;$('calendarMonth').textContent='';$('calendarNote').textContent='';$('calendarEntries').replaceChildren();clearAttachment();showAvatar(null);$('agentAvatarFile').value='';$('todayCounts').textContent='';$('todayJobs').replaceChildren();brainDirty=false;editReport=null;$('agentJobs').replaceChildren();$('routineList').replaceChildren();$('reportList').replaceChildren();$('agentTrace').textContent='';$('agentCommand').value='';$('reportBody').value='';$('brainInstructions').value='';$('brainMemory').value='';$('reportEditor').hidden=true;$('agentNotice').textContent='';$('agentConnections').replaceChildren();$('routineTitle').value='';$('routineCommand').value='';$('routineId').value='';$('reportEditTitle').textContent='রিপোর্ট সংশোধন';$('tracePanel').hidden=true;}};
+	  return{refresh,reset(){++epoch;if(timer)clearInterval(timer);timer=null;state=null;pending=null;conversationId='main';$('conversationList').replaceChildren();$('pushNotice').textContent='';$('liveVerifyResult').replaceChildren();drawer(false);calendarMonth=null;++calendarRequest;$('workCalendar').open=false;$('calendarMonth').textContent='';$('calendarNote').textContent='';$('calendarEntries').replaceChildren();clearAttachment();showAvatar(null);$('agentAvatarFile').value='';$('todayCounts').textContent='';$('todayJobs').replaceChildren();brainDirty=false;editReport=null;$('agentJobs').replaceChildren();$('routineList').replaceChildren();$('reportList').replaceChildren();$('agentTrace').textContent='';$('agentCommand').value='';$('reportBody').value='';$('brainInstructions').value='';$('brainMemory').value='';$('reportEditor').hidden=true;$('agentNotice').textContent='';$('agentConnections').replaceChildren();$('routineTitle').value='';$('routineCommand').value='';$('routineId').value='';$('reportEditTitle').textContent='রিপোর্ট সংশোধন';$('tracePanel').hidden=true;}};
 }
