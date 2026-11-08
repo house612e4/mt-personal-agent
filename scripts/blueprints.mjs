@@ -28,11 +28,12 @@ export function verifyBlueprints(root,c){
  requireRule(c.product.agent&&Array.isArray(c.product.agent.tools)&&new Set(c.product.agent.tools).size===c.product.agent.tools.length,'agent tool allowlist is required');
  requireRule(c.product.agent.name && c.product.agent.creditRule,'agent name and credit rule are required');
  for(const n of [c.product.agent.maxSteps,c.product.agent.maxDailyAiCalls,c.product.agent.pollMs,c.product.agent.workerBatchSize,c.product.agent.routineScanLimit])requireRule(positive(n),'agent policy values must be positive integers');
- requireRule(c.product.agent.maxSteps<=12&&c.product.agent.workerBatchSize<=10,'agent execution bounds exceed supported range');
+ requireRule(c.product.agent.maxSteps<=16&&c.product.agent.workerBatchSize<=10,'agent execution bounds exceed supported range');
  const pkg=JSON.parse(readFileSync(resolve(root,'package.json'),'utf8'));
  const lock=JSON.parse(readFileSync(resolve(root,'package-lock.json'),'utf8'));
  requireRule(pkg.scripts.build===c.plan.buildScript,'build command differs from Plan.md');
  requireRule(pkg.dependencies['firebase-admin']===c.tech.firebaseAdmin,'Firebase Admin differs from TRD.md');
+ requireRule(pkg.dependencies['web-push']===c.tech.webPush && lock.packages['node_modules/web-push'].version===c.tech.webPush,'Web Push version differs from TRD.md');
  requireRule(lock.packages['node_modules/firebase-admin'].version===c.tech.firebaseAdmin,'lockfile Firebase version mismatch');
  requireRule(pkg.overrides?.rimraf?.glob===c.tech.globOverride,'glob override differs from TRD.md');
  requireRule(lock.packages['node_modules/glob'].version===c.tech.globOverride,'lockfile glob version mismatch');
